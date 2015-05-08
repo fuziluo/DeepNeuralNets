@@ -172,8 +172,12 @@ public class IrisDataProvider implements TrainingDataProvider{
     private int currentIndex;
     private int batchSize;
 	private boolean random;
+	private float[] labels;
 	public IrisDataProvider(int batchSize, boolean random) {
 		currentIndex = 0;
+		if (batchSize < 1 || batchSize > datasetSize) {
+			throw new IllegalArgumentException("batchSize must be withi 1 and " + datasetSize);
+		}
 		this.batchSize = batchSize;
 		for (int i = 0; i < datasetSize; i++) {
 			indexSeq.add(i);
@@ -189,26 +193,42 @@ public class IrisDataProvider implements TrainingDataProvider{
 		int dataSize = irisData[0].length;
 		int dataSizeWithBias = dataSize + (bias ? 1 : 0);
 		float[] result = new float[dataSizeWithBias * batchSize];
+		labels = new float[3 * batchSize]; //3 kinds of iris
 		for (int i = 0; i < batchSize; i++) {
-			System.arraycopy(irisData[indexSeq.get(currentIndex + i)], 0, result, i * dataSizeWithBias, dataSize);
+			currentIndex ++;
+			if (currentIndex >= datasetSize) {
+				if (random) {
+					Collections.shuffle(indexSeq, new Random());
+				}
+				currentIndex = currentIndex % datasetSize;
+			}
+			System.arraycopy(irisData[indexSeq.get(currentIndex)], 0, result, i * dataSizeWithBias, dataSize);
 			if (bias) { //bias activation is always 1
 				result[i * dataSizeWithBias + dataSize] = 1;
 			}
+			if (indexSeq.get(currentIndex) < 50) {
+				labels[i * 3] = 1;
+			} else if (indexSeq.get(currentIndex) < 100) {
+				labels[i * 3 + 1] = 1;
+			} else {
+				labels[i * 3 + 2] = 1;
+			}
 //			currentIndex++;
 		}
+		
 		return result;
 	}
 	public float[] getNextBatchLabel() {
-		float[] result = new float[3 * batchSize]; //3 kinds of iris
-		for (int i = 0; i < batchSize; i++) {
-			if (indexSeq.get(currentIndex + i) < 50) {
-				result[i * 3] = 1;
-			} else if (indexSeq.get(currentIndex + i) < 100) {
-				result[i * 3 + 1] = 1;
-			} else {
-				result[i * 3 + 2] = 1;
-			}
-		}		
+//		float[] labels = new float[3 * batchSize]; //3 kinds of iris
+//		for (int i = 0; i < batchSize; i++) {
+//			if (indexSeq.get(currentIndex + i) < 50) {
+//				labels[i * 3] = 1;
+//			} else if (indexSeq.get(currentIndex + i) < 100) {
+//				labels[i * 3 + 1] = 1;
+//			} else {
+//				labels[i * 3 + 2] = 1;
+//			}
+//		}		
 		currentIndex += batchSize;
 		if (currentIndex >= datasetSize) {
 			if (random) {
@@ -216,7 +236,7 @@ public class IrisDataProvider implements TrainingDataProvider{
 			}
 			currentIndex = currentIndex % datasetSize;
 		}
-		return result;
+		return labels;
 	}
 	public void reset() {
 		currentIndex = 0;

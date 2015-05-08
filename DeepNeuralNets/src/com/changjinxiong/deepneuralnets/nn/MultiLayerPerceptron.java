@@ -1,6 +1,10 @@
 package com.changjinxiong.deepneuralnets.nn;
 import static java.lang.Math.*;
 
+import java.util.Arrays;
+
+import com.changjinxiong.deepneuralnets.opencl.OpenCL;
+
 
 /**
  * Multi-layer Perceptron
@@ -46,32 +50,33 @@ public class MultiLayerPerceptron {
 	public Layer getOutputLayer() {
 		return outputLayer;
 	}
-	public void fordwardPass(float[] inputSamples) {
+	public void fordwardPass(float[] inputSamples, boolean useOpenCL) {
 		inputLayer.setActivations(inputSamples); //provide input data
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
 			currentLayer = currentLayer.getNextLayer();
-			currentLayer.forwardPass();
+			currentLayer.forwardPass(useOpenCL);
 		}
 				
 	}
-	public void backPropagation(float[] labels) {
+	public void backPropagation(float[] labels, boolean useOpenCL) {
 		//calculate the error aka the derivative of mean squared error cost function
 		int labelSize = outputLayer.getNumOfNodes();
 		int batchSize = outputLayer.getBatchSize();
 		float[] activations = outputLayer.getActivations();
 		float[] error = new float[labelSize * batchSize];
+		//calculate the error
 		for (int i = 0; i < batchSize; i++) {
 			for (int j = 0; j < labelSize; j++) {
-				error[i * labelSize + j] += (-labels[i * labelSize + j] + activations[i * labelSize + j]);
+				error[i * labelSize + j] = (-labels[i * labelSize + j] + activations[i * labelSize + j]);
 			}
 		}
-
+//		System.out.println(Arrays.toString(activations));
 		//set the error
 		outputLayer.setError(error); 
 		Layer currentLayer = outputLayer;
 		while (currentLayer.getPreviousLayer() != null) {
-			currentLayer.backpropagation();
+			currentLayer.backpropagation(useOpenCL);
 			currentLayer = currentLayer.getPreviousLayer();
 		}		
 	}
@@ -82,16 +87,21 @@ public class MultiLayerPerceptron {
 			currentLayer.updateWeights(learningRate);
 		}
 	}
-	public void train(TrainingDataProvider trainingDataProvider, float learningRate, int maxEpoch) {
+	public void train(TrainingDataProvider trainingDataProvider, float learningRate, int maxEpoch, boolean useOpenCL) {
 		trainingDataProvider.reset();
 		for (int i = 0; i < trainingDataProvider.getDatasetSize() * maxEpoch; i += trainingDataProvider.getBatchSize()) {
-			fordwardPass(trainingDataProvider.getNextbatchInput(bias));
+			fordwardPass(trainingDataProvider.getNextbatchInput(bias), useOpenCL);
 			//monitor the cost
 			float [] batchLabels = trainingDataProvider.getNextBatchLabel();
 			float cost = getCost(batchLabels);
 			System.out.println(cost);
-			backPropagation(batchLabels);
-			updateWeights(learningRate);			
+			backPropagation(batchLabels, useOpenCL);
+			updateWeights(learningRate);	
+			//////////////////////////
+//			return;
+		}
+		if (useOpenCL) {
+			OpenCL.releaseAll();
 		}
 	}
 	/**

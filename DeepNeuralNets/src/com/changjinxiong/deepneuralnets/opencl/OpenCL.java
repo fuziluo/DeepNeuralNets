@@ -58,20 +58,26 @@ public final class OpenCL {
 	}
 
 	public static cl_context getContext() {
+		if (context == null) {
+			context = contextInitializer();
+		}
 		return context;
 	}
 
 	public static cl_program getProgram() {
+		if (program == null) {
+			program = programInitializer();
+		}
 		return program;
 	}
 	private static final cl_program programInitializer() {
         String fileContent = "";
       //TODO path of OpenCL kernel source file
         String path = System.getProperty("user.dir"); 
-        path = path.substring(0,path.indexOf("nn-"));
 //        System.out.println(path);
 		try {
-			fileContent = new String(Files.readAllBytes(Paths.get(path, "/nn-core/src/main/java/com/github/neuralnetworks/opencl/kernel/kernel.cl")));
+			//TODO
+			fileContent = new String(Files.readAllBytes(Paths.get(path, "/opencl/kernel/fullyConnected.cl")));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -82,6 +88,19 @@ public final class OpenCL {
 
 		return program;
 	}
-
+	public static void releaseContext() {
+        clReleaseContext(context);
+        context = null;
+	}	
+	public static void releaseProgram() {
+        clReleaseProgram(program);
+        program = null;
+	}
+	public static void releaseAll() {
+        clReleaseProgram(program);
+        clReleaseContext(context);
+        context = null;
+        program = null;
+	}
 	
 }

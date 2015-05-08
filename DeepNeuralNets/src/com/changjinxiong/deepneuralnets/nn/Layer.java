@@ -8,10 +8,10 @@ public interface Layer {
 	public float[] getWeight();
 	public void updateWeights(float learningRate);
 //	public void setWeight(float[] weights);	
-	public void backpropagation(); //training
+	public void backpropagation(boolean useOpenCL); //training
 	public float[] getActivations();
 	public void setActivations(float[] activations);
-	public void forwardPass(); //forward pass
+	public void forwardPass(boolean useOpenCL); //forward pass
 	public Layer getPreviousLayer();
 //	public void setPreviousLayer(Layer previousLayer);
 	public Layer getNextLayer();
