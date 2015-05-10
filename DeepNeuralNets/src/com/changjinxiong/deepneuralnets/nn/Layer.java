@@ -6,7 +6,7 @@ package com.changjinxiong.deepneuralnets.nn;
  */
 public interface Layer {
 	public float[] getWeight();
-	public void updateWeights(float learningRate);
+	public void updateWeights(float learningRate, float momentum);
 //	public void setWeight(float[] weights);	
 	public void backpropagation(boolean useOpenCL); //training
 	public float[] getActivations();

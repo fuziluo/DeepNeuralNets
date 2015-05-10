@@ -1,9 +1,12 @@
 package com.changjinxiong.deepneuralnets.nn;
 import static java.lang.Math.*;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 
 import com.changjinxiong.deepneuralnets.opencl.OpenCL;
+import com.changjinxiong.deepneuralnets.test.DataProvider;
+import com.changjinxiong.deepneuralnets.test.IrisDataProvider;
 
 
 /**
@@ -69,9 +72,11 @@ public class MultiLayerPerceptron {
 		for (int i = 0; i < batchSize; i++) {
 			for (int j = 0; j < labelSize; j++) {
 				error[i * labelSize + j] = (-labels[i * labelSize + j] + activations[i * labelSize + j]);
+//				error[i * labelSize + j] *= activations[i * labelSize + j] * (1 - activations[i * labelSize + j]);
 			}
 		}
 //		System.out.println(Arrays.toString(activations));
+//		System.out.println(Arrays.toString(labels));
 		//set the error
 		outputLayer.setError(error); 
 		Layer currentLayer = outputLayer;
@@ -80,23 +85,77 @@ public class MultiLayerPerceptron {
 			currentLayer = currentLayer.getPreviousLayer();
 		}		
 	}
-	public void updateWeights(float learningRate) {
+	public void updateWeights(float learningRate, float momentum) {
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
 			currentLayer = currentLayer.getNextLayer();
-			currentLayer.updateWeights(learningRate);
+			currentLayer.updateWeights(learningRate, momentum);
 		}
 	}
-	public void train(TrainingDataProvider trainingDataProvider, float learningRate, int maxEpoch, boolean useOpenCL) {
-		trainingDataProvider.reset();
-		for (int i = 0; i < trainingDataProvider.getDatasetSize() * maxEpoch; i += trainingDataProvider.getBatchSize()) {
-			fordwardPass(trainingDataProvider.getNextbatchInput(bias), useOpenCL);
+	public float test(DataProvider dp, boolean useOpenCL) {
+		int testNum = 0;
+		ArrayList<Float> testResult = new ArrayList<Float>();
+		ArrayList<Float> labels = new ArrayList<Float>();
+		for ( ; testNum < dp.getDatasetSize(); testNum += dp.getBatchSize()) {
+//		for ( ; testNum < 1; testNum += dp.getBatchSize()) {
+			fordwardPass(dp.getNextbatchInput(bias), useOpenCL);
+			for (float a : getOutputLayer().getActivations()) {
+				testResult.add(a);
+			}
+			for (float l : dp.getNextBatchLabel()) {
+				labels.add(l);
+			}
+		}
+//		System.out.println(testNum);
+		Float[] a = new Float[testNum * dp.getLabelDimension()];
+		a = testResult.toArray(a);
+		Float[] t = new Float[testNum * dp.getLabelDimension()];
+		t = labels.toArray(t);
+		float count = 0;
+		for (int i = 0; i < testNum * dp.getLabelDimension(); i += dp.getLabelDimension()) {
+			int maxInd = 0;
+			for (int j = 0; j < dp.getLabelDimension() - 1; j++) {
+				if (a[i + maxInd] > a[i + j + 1]) {
+					a[i + j + 1] = 0f;
+				} else {
+					a[i + maxInd] = 0f;
+					maxInd = j + 1;
+				}
+			}
+			a[i + maxInd] = 1f;
+			if (t[i + maxInd] != 1){
+				count++;
+			}
+		}
+		
+//		System.out.println(Arrays.toString(a));
+//		System.out.println(Arrays.toString(t));
+		float errorRate = count/testNum;
+		System.out.printf("%.0f out of %d wrong. Error rate is %.2f\n", count, testNum, errorRate);
+		return errorRate;
+	}
+	public void train(DataProvider dp, float learningRate, float momentum, int maxEpoch, boolean useOpenCL) {
+		dp.reset();
+		float baseLr = learningRate;
+		float averageCost = 0;
+		for (int i = 0, j = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize(), j++) {
+//		for (int i = 0; i <  1; i += dp.getBatchSize()) {
+			fordwardPass(dp.getNextbatchInput(bias), useOpenCL);
 			//monitor the cost
-			float [] batchLabels = trainingDataProvider.getNextBatchLabel();
+			float [] batchLabels = dp.getNextBatchLabel();
 			float cost = getCost(batchLabels);
-			System.out.println(cost);
+//			System.out.println(cost);
 			backPropagation(batchLabels, useOpenCL);
-			updateWeights(learningRate);	
+			averageCost += cost;
+			if (j >= dp.getDatasetSize() / dp.getBatchSize()) {
+				baseLr *= 0.8;
+				averageCost /= j;
+				System.out.printf("Average cost over last %d batches is %.5f\n", j, averageCost);
+				System.out.printf("learning rate reduced to %f after %d batches\n", baseLr, i);
+				j = 0;
+				averageCost = 0;
+			}
+			updateWeights(baseLr, momentum);	
 			//////////////////////////
 //			return;
 		}
@@ -126,6 +185,7 @@ public class MultiLayerPerceptron {
 //						(1 - labels[j * labelSize + i]) * log(1 - activations[j * labelSize + i]);
 				//the above formula could produce NaN when activation == 1
 				singleCost += (labels[j * labelSize + i] == 1) ? log(activations[j * labelSize + i]) : log(1 - activations[j * labelSize + i]);
+//				singleCost += -0.5*pow(labels[j * labelSize + i] - activations[j * labelSize + i], 2);
 			}
 			result -= singleCost/batchSize;
 		}

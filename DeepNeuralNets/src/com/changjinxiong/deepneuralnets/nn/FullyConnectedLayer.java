@@ -22,6 +22,7 @@ public class FullyConnectedLayer implements Layer{
 	private final float[] weights; //the weights used to compute activations of this layer
 	private float[] error; //error for backpropagation
 	private final float[] gradients; 
+	private final float[] weightsUpdate; 	
 	private final Layer previousLayer;
 	private Layer nextLayer;
 	private int batchSize = 0; //batch size could change in different calculation
@@ -38,9 +39,11 @@ public class FullyConnectedLayer implements Layer{
 			//randomly initialize weights
 			initializeWeights(weights);
 			gradients = new float[weights.length];
+			weightsUpdate = new float[weights.length];
 		} else {
 			weights = null;
 			gradients = null;
+			weightsUpdate = null;
 		}
 
 	}
@@ -329,7 +332,7 @@ public class FullyConnectedLayer implements Layer{
 	private void initializeWeights(float[] weights) {
 		Random rnd = new Random(0);
 		for (int i = 0; i < weights.length; i++) {
-			weights[i] = rnd.nextFloat();
+			weights[i] = rnd.nextFloat() - 0.5f;
 		}
 	}
 
@@ -391,14 +394,16 @@ public class FullyConnectedLayer implements Layer{
 		return gradients;
 	}
 
-	public void updateWeights(float learningRate) {
+	public void updateWeights(float learningRate, float momentum) {
 		if (previousLayer == null) { //input layer
 			assert false; //not supposed to be here
 			return;
 		}
 //		System.out.println(Arrays.toString(gradients));
 		for (int i = 0; i < weights.length; i++) {
-			weights[i] -= learningRate * gradients[i];
+			weightsUpdate[i] = momentum * weightsUpdate[i] - learningRate * gradients[i];
+			weights[i] += weightsUpdate[i];
+//			System.out.println(weights[i]+" "+learningRate+" "+gradients[i]);
 			gradients[i] = 0;
 		}
 	}

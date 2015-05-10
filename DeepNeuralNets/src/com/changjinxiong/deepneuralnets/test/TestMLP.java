@@ -242,5 +242,39 @@ public class TestMLP {
 		assertEquals(c1, c2, 0.0001);
 
 	}
+	
+	@Test
+	public void gradientCheck() {
+		MultiLayerPerceptron mlp = new MultiLayerPerceptron(new int[]{784,300,10}, true);
+		Layer l3 = mlp.getOutputLayer();
+		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", 1, false);
+//		float[] tin = {	0.1f, 0.2f, 0.3f, 1,
+//						0.4f, 0.5f, 0.6f, 1,
+//						0.7f, 0.8f, 0.9f, 1};
+//		float[] tout = {1, 0,
+//						0, 1,
+//						1, 1};
+		float[] tin = mnistTraining.getNextbatchInput(true);
+		float[] tout = mnistTraining.getNextBatchLabel();
+		mlp.fordwardPass(tin, false);
+//		float c1 = mlp.getCost(tout);
+		mlp.backPropagation(tout, false);
+		int i = 9;
+		float g1 = l3.getGradients()[i];
+		float w = l3.getWeight()[i];
+		float e = 0.001f;
+		l3.getWeight()[i] = w - e;
+//		System.out.println(l3.getWeight()[i]);
+		mlp.fordwardPass(tin, false);
+		float c1 = mlp.getCost(tout);
+		l3.getWeight()[i] = w + e;
+//		System.out.println(l3.getWeight()[i]);
+		mlp.fordwardPass(tin, false);
+		float c2 = mlp.getCost(tout);
+		float g2 = (c2 - c1)/(2 * e);
+		System.out.println(g1+" "+g2);
+		assertEquals(g1, g2, 0.0001);
+
+	}
 
 }

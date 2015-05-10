@@ -1,4 +1,4 @@
-package com.changjinxiong.deepneuralnets.nn;
+package com.changjinxiong.deepneuralnets.test;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -8,7 +8,7 @@ import java.util.Random;
  * @author jxchang
  *
  */
-public class IrisDataProvider implements TrainingDataProvider{
+public class IrisDataProvider implements DataProvider{
 	/**
 	 * Iris dataset (http://archive.ics.uci.edu/ml/datasets/Iris)
 	 * the first 50 samplea are class 1
@@ -186,7 +186,6 @@ public class IrisDataProvider implements TrainingDataProvider{
 		if (random) {
 			Collections.shuffle(indexSeq, new Random()); //fix seed here for debugging TODO
 		}
-
 	}
 
 	public float[] getNextbatchInput(boolean bias) {
@@ -195,13 +194,6 @@ public class IrisDataProvider implements TrainingDataProvider{
 		float[] result = new float[dataSizeWithBias * batchSize];
 		labels = new float[3 * batchSize]; //3 kinds of iris
 		for (int i = 0; i < batchSize; i++) {
-			currentIndex ++;
-			if (currentIndex >= datasetSize) {
-				if (random) {
-					Collections.shuffle(indexSeq, new Random());
-				}
-				currentIndex = currentIndex % datasetSize;
-			}
 			System.arraycopy(irisData[indexSeq.get(currentIndex)], 0, result, i * dataSizeWithBias, dataSize);
 			if (bias) { //bias activation is always 1
 				result[i * dataSizeWithBias + dataSize] = 1;
@@ -213,29 +205,18 @@ public class IrisDataProvider implements TrainingDataProvider{
 			} else {
 				labels[i * 3 + 2] = 1;
 			}
-//			currentIndex++;
+			currentIndex ++;
+			if (currentIndex >= datasetSize) {
+				if (random) {
+					Collections.shuffle(indexSeq, new Random());
+				}
+				currentIndex = currentIndex % datasetSize;
+			}
 		}
 		
 		return result;
 	}
 	public float[] getNextBatchLabel() {
-//		float[] labels = new float[3 * batchSize]; //3 kinds of iris
-//		for (int i = 0; i < batchSize; i++) {
-//			if (indexSeq.get(currentIndex + i) < 50) {
-//				labels[i * 3] = 1;
-//			} else if (indexSeq.get(currentIndex + i) < 100) {
-//				labels[i * 3 + 1] = 1;
-//			} else {
-//				labels[i * 3 + 2] = 1;
-//			}
-//		}		
-		currentIndex += batchSize;
-		if (currentIndex >= datasetSize) {
-			if (random) {
-				Collections.shuffle(indexSeq, new Random());
-			}
-			currentIndex = currentIndex % datasetSize;
-		}
 		return labels;
 	}
 	public void reset() {
@@ -250,5 +231,16 @@ public class IrisDataProvider implements TrainingDataProvider{
 	@Override
 	public int getBatchSize() {
 		return batchSize;
+	}
+
+	@Override
+	public int getDataDimemsion() {
+		return 4;
+	}
+
+	@Override
+	public int getLabelDimension() {
+		// TODO Auto-generated method stub
+		return 3;
 	}
 }
