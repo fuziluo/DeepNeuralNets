@@ -32,19 +32,13 @@ public class MultiLayerPerceptron {
 		}
 		this.bias = bias;
 		int numOfLayers = perceptronsOfLayers.length;
-		inputLayer = new FullyConnectedLayer(perceptronsOfLayers[0], null, null, bias);
+		inputLayer = new FullyConnectedLayer(perceptronsOfLayers[0], null, null, false);
 		outputLayer = inputLayer;		
-		for (int i = 1; i < numOfLayers - 1; i++ ) {
+		for (int i = 1; i < numOfLayers; i++ ) {
 			Layer newLayer = new FullyConnectedLayer(perceptronsOfLayers[i], outputLayer, null, bias);
 			outputLayer.setNextLayer(newLayer);
 			outputLayer = newLayer;
-		}
-		Layer newLayer = new FullyConnectedLayer(perceptronsOfLayers[numOfLayers - 1], outputLayer, null, false);
-		outputLayer.setNextLayer(newLayer);
-		outputLayer = newLayer;
-
-		
-		
+		}		
 	}
 	
 	public Layer getInputLayer() {
@@ -53,8 +47,9 @@ public class MultiLayerPerceptron {
 	public Layer getOutputLayer() {
 		return outputLayer;
 	}
-	public void fordwardPass(float[] inputSamples, boolean useOpenCL) {
-		inputLayer.setActivations(inputSamples); //provide input data
+	public void fordwardPass(float[] inputSamples, int batchSize, boolean useOpenCL) {
+		inputLayer.setInputShape(new int[] {batchSize});
+		inputLayer.setInputs(inputSamples); //provide input data
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
 			currentLayer = currentLayer.getNextLayer();
@@ -78,7 +73,7 @@ public class MultiLayerPerceptron {
 //		System.out.println(Arrays.toString(activations));
 //		System.out.println(Arrays.toString(labels));
 		//set the error
-		outputLayer.setError(error); 
+		outputLayer.setErrors(error); 
 		Layer currentLayer = outputLayer;
 		while (currentLayer.getPreviousLayer() != null) {
 			currentLayer.backpropagation(useOpenCL);
@@ -98,7 +93,7 @@ public class MultiLayerPerceptron {
 		ArrayList<Float> labels = new ArrayList<Float>();
 		for ( ; testNum < dp.getDatasetSize(); testNum += dp.getBatchSize()) {
 //		for ( ; testNum < 1; testNum += dp.getBatchSize()) {
-			fordwardPass(dp.getNextbatchInput(bias), useOpenCL);
+			fordwardPass(dp.getNextbatchInput(bias), dp.getBatchSize(), useOpenCL);
 			for (float a : getOutputLayer().getActivations()) {
 				testResult.add(a);
 			}
@@ -140,7 +135,7 @@ public class MultiLayerPerceptron {
 		float averageCost = 0;
 		for (int i = 0, j = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize(), j++) {
 //		for (int i = 0; i <  1; i += dp.getBatchSize()) {
-			fordwardPass(dp.getNextbatchInput(bias), useOpenCL);
+			fordwardPass(dp.getNextbatchInput(bias), dp.getBatchSize(), useOpenCL);
 			//monitor the cost
 			float [] batchLabels = dp.getNextBatchLabel();
 			float cost = getCost(batchLabels);
@@ -148,7 +143,8 @@ public class MultiLayerPerceptron {
 			backPropagation(batchLabels, useOpenCL);
 			averageCost += cost;
 			if (j >= dp.getDatasetSize() / dp.getBatchSize()) {
-				baseLr *= 0.8;
+				//TODO add argument to control decay
+//				baseLr *= 0.8;
 				averageCost /= j;
 				System.out.printf("Average cost over last %d batches is %.5f\n", j, averageCost);
 				System.out.printf("learning rate reduced to %f after %d batches\n", baseLr, i);
@@ -191,11 +187,6 @@ public class MultiLayerPerceptron {
 		}
 
 		return result;
-	}
-
-	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-
 	}
 
 }

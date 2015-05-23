@@ -66,10 +66,10 @@ public class TestIris {
 	}
 	@Test
 	public void test() {
-		MultiLayerPerceptron mlp = new MultiLayerPerceptron(new int[]{4,32,3}, true); //overfitting
+		MultiLayerPerceptron mlp = new MultiLayerPerceptron(new int[]{4,30,3}, true); //overfitting
 		int batchSize = 150;
 		IrisDataProvider tp = new IrisDataProvider(batchSize, false);
-		mlp.train(tp, 0.005f, 0.0f, 2000, false);
+		mlp.train(tp, 0.005f, 0.0f, 2000, true);
 		//test
 		IrisDataProvider tp1 = new IrisDataProvider(150, false);
 //		mlp.fordwardPass(tp1.getNextbatchInput(true), false);

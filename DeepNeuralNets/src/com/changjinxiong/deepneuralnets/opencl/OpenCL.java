@@ -7,6 +7,7 @@ import java.nio.file.Paths;
 
 import org.jocl.*;
 public final class OpenCL {
+	private static final int PREFERRED_GROUP_SIZE = 25;
 	static private cl_platform_id platform = platformInitializer();
 	static private cl_device_id device = deviceInitializer();
 	static private cl_context context = contextInitializer();
@@ -78,6 +79,7 @@ public final class OpenCL {
 		try {
 			//TODO
 			fileContent = new String(Files.readAllBytes(Paths.get(path, "/opencl/kernel/fullyConnected.cl")));
+			fileContent = "#define groupSize " + PREFERRED_GROUP_SIZE + "\n" + fileContent;
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -101,6 +103,10 @@ public final class OpenCL {
         clReleaseContext(context);
         context = null;
         program = null;
+	}
+	public static int[] getPreferredGroupSize() {
+		//TODO
+		return new int[] {PREFERRED_GROUP_SIZE, PREFERRED_GROUP_SIZE};
 	}
 	
 }

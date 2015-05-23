@@ -40,7 +40,6 @@ public class TestMLP {
 	public void testWeightsSize() {
 		//check weights
 		MultiLayerPerceptron mlp = new MultiLayerPerceptron(new int[]{10,20,30,20,10,1}, true);
-		assertNull(mlp.getInputLayer().getWeight()) ;
 		assertEquals(mlp.getInputLayer().getNextLayer().getWeight().length, 11*20, 0);
 		assertEquals(mlp.getInputLayer().getNextLayer().getNextLayer().getWeight().length, 21*30, 0);
 		assertEquals(mlp.getOutputLayer().getPreviousLayer().getPreviousLayer().getWeight().length, 31*20, 0);
@@ -60,13 +59,13 @@ public class TestMLP {
 		l2.getWeight()[1] = 0.2f;
 		l2.getWeight()[2] = 0.3f;
 		l2.getWeight()[3] = 0.4f;		
-		mlp.fordwardPass(new float[] {1, 2}, false);
+		mlp.fordwardPass(new float[] {1, 2}, 1, false);
 //		System.out.println(Arrays.toString(l2.getWeight()));
 		assertEquals(l2.getActivations()[0], 0.622459, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.750260, 0.00001);
 		assertEquals(l3.getActivations()[0], 0.552876, 0.00001);
 		//test OpenCL
-		mlp.fordwardPass(new float[] {1, 2}, true);
+		mlp.fordwardPass(new float[] {1, 2}, 1, true);
 		assertEquals(l2.getActivations()[0], 0.622459, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.750260, 0.00001);
 		assertEquals(l3.getActivations()[0], 0.552876, 0.00001);
@@ -86,7 +85,7 @@ public class TestMLP {
 		l2.getWeight()[3] = 0.4f;		
 		l2.getWeight()[4] = 0.5f;		
 		l2.getWeight()[5] = 0.6f;		
-		mlp.fordwardPass(new float[] {1, 2, 1}, false);
+		mlp.fordwardPass(new float[] {1, 2, 1}, 1, false);
 		assertEquals(l2.getActivations()[0], 0.689974, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.880797, 0.00001);
 		assertEquals(l3.getActivations()[0], 0.6330112, 0.00001);
@@ -106,7 +105,7 @@ public class TestMLP {
 		l2.getWeight()[3] = 0.4f;		
 		l2.getWeight()[4] = 0.5f;		
 		l2.getWeight()[5] = 0.6f;		
-		mlp.fordwardPass(new float[] {1, 2, 1}, true);
+		mlp.fordwardPass(new float[] {1, 2, 1}, 1, true);
 		assertEquals(l2.getActivations()[0], 0.689974, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.880797, 0.00001);
 		assertEquals(l3.getActivations()[0], 0.6330112, 0.00001);
@@ -134,7 +133,7 @@ public class TestMLP {
 		l2.getWeight()[3] = 0.4f;		
 		l2.getWeight()[4] = 0.5f;		
 		l2.getWeight()[5] = 0.6f;		
-		mlp.fordwardPass(new float[] {1, 2, 1}, true);
+		mlp.fordwardPass(new float[] {1, 2, 1}, 1, true);
 		//check back propagation 
 		//gradient checking verify correctness of weight derivatives
 
@@ -205,7 +204,7 @@ public class TestMLP {
 				1, 1
 									
 									};
-		mlp.fordwardPass(tin , false);
+		mlp.fordwardPass(tin , 33, false);
 		float c1 = mlp.getCost(tout);
 		mlp.backPropagation(tout, false);
 //		mlp.updateWeights(0.01f);
@@ -223,7 +222,7 @@ public class TestMLP {
 		l1 = mlp1.getInputLayer();
 			
 
-		mlp1.fordwardPass(tin, true);
+		mlp1.fordwardPass(tin, 33, true);
 		float c2 = mlp1.getCost(tout);
 		mlp1.backPropagation(tout, true);
 //		mlp1.updateWeights(0.01f);
@@ -256,7 +255,7 @@ public class TestMLP {
 //						1, 1};
 		float[] tin = mnistTraining.getNextbatchInput(true);
 		float[] tout = mnistTraining.getNextBatchLabel();
-		mlp.fordwardPass(tin, false);
+		mlp.fordwardPass(tin, 1, false);
 //		float c1 = mlp.getCost(tout);
 		mlp.backPropagation(tout, false);
 		int i = 9;
@@ -265,11 +264,11 @@ public class TestMLP {
 		float e = 0.001f;
 		l3.getWeight()[i] = w - e;
 //		System.out.println(l3.getWeight()[i]);
-		mlp.fordwardPass(tin, false);
+		mlp.fordwardPass(tin, 1, false);
 		float c1 = mlp.getCost(tout);
 		l3.getWeight()[i] = w + e;
 //		System.out.println(l3.getWeight()[i]);
-		mlp.fordwardPass(tin, false);
+		mlp.fordwardPass(tin, 1, false);
 		float c2 = mlp.getCost(tout);
 		float g2 = (c2 - c1)/(2 * e);
 		System.out.println(g1+" "+g2);
