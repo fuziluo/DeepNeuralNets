@@ -14,7 +14,7 @@ import com.changjinxiong.deepneuralnets.test.IrisDataProvider;
  * @author jxchang
  *
  */
-public class MultiLayerPerceptron {
+public class MultiLayerPerceptron implements NeuralNetwork {
 	
 	private Layer inputLayer = null;
 	private Layer outputLayer = null;
@@ -41,12 +41,24 @@ public class MultiLayerPerceptron {
 		}		
 	}
 	
+	/* (non-Javadoc)
+	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#getInputLayer()
+	 */
+	@Override
 	public Layer getInputLayer() {
 		return inputLayer;
 	}
+	/* (non-Javadoc)
+	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#getOutputLayer()
+	 */
+	@Override
 	public Layer getOutputLayer() {
 		return outputLayer;
 	}
+	/* (non-Javadoc)
+	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#fordwardPass(float[], int, boolean)
+	 */
+	@Override
 	public void fordwardPass(float[] inputSamples, int batchSize, boolean useOpenCL) {
 		inputLayer.setInputShape(new int[] {batchSize});
 		inputLayer.setInputs(inputSamples); //provide input data
@@ -57,6 +69,10 @@ public class MultiLayerPerceptron {
 		}
 				
 	}
+	/* (non-Javadoc)
+	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#backPropagation(float[], boolean)
+	 */
+	@Override
 	public void backPropagation(float[] labels, boolean useOpenCL) {
 		//calculate the error aka the derivative of mean squared error cost function
 		int labelSize = outputLayer.getNumOfNodes();
@@ -80,6 +96,10 @@ public class MultiLayerPerceptron {
 			currentLayer = currentLayer.getPreviousLayer();
 		}		
 	}
+	/* (non-Javadoc)
+	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#updateWeights(float, float)
+	 */
+	@Override
 	public void updateWeights(float learningRate, float momentum) {
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
@@ -87,6 +107,10 @@ public class MultiLayerPerceptron {
 			currentLayer.updateWeights(learningRate, momentum);
 		}
 	}
+	/* (non-Javadoc)
+	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#test(com.changjinxiong.deepneuralnets.test.DataProvider, boolean)
+	 */
+	@Override
 	public float test(DataProvider dp, boolean useOpenCL) {
 		int testNum = 0;
 		ArrayList<Float> testResult = new ArrayList<Float>();
@@ -129,11 +153,28 @@ public class MultiLayerPerceptron {
 		System.out.printf("%.0f out of %d wrong. Error rate is %.2f\n", count, testNum, errorRate);
 		return errorRate;
 	}
-	public void train(DataProvider dp, float learningRate, float momentum, int maxEpoch, boolean useOpenCL) {
+	/* (non-Javadoc)
+	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#train(com.changjinxiong.deepneuralnets.test.DataProvider, float, float, int, boolean)
+	 */
+	@Override
+	public void train(DataProvider dp, float learningRate, float momentum, 
+			 int decayCycle, float decayRate, int maxEpoch, boolean useOpenCL) {
+		if (learningRate < 0) {
+			throw new IllegalArgumentException("learningRate cannot be negtive");
+		}
+		if (momentum < 0) {
+			throw new IllegalArgumentException("momentum cannot be negtive");
+		}
+		if (decayCycle < 0) {
+			throw new IllegalArgumentException("decayCycle cannot be negtive");
+		}
+		if (decayCycle > 0 && (decayRate <= 0 || decayRate >= 1)) {
+			throw new IllegalArgumentException("decayRate should be within (0, 1)");
+		}
 		dp.reset();
 		float baseLr = learningRate;
 		float averageCost = 0;
-		for (int i = 0, j = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize(), j++) {
+		for (int i = 0, j = 0, k = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize(), j++, k++) {
 //		for (int i = 0; i <  1; i += dp.getBatchSize()) {
 			fordwardPass(dp.getNextbatchInput(bias), dp.getBatchSize(), useOpenCL);
 			//monitor the cost
@@ -142,14 +183,18 @@ public class MultiLayerPerceptron {
 //			System.out.println(cost);
 			backPropagation(batchLabels, useOpenCL);
 			averageCost += cost;
-			if (j >= dp.getDatasetSize() / dp.getBatchSize()) {
+			if (k >= dp.getDatasetSize() / dp.getBatchSize()) {
+				averageCost /= k;
+				System.out.printf("Average cost over last %d batches is %.5f\n", k, averageCost);
+				k = 0;
+				averageCost = 0;
+			}
+			if (decayCycle > 0 && j >= decayCycle) {
 				//TODO add argument to control decay
 //				baseLr *= 0.8;
-				averageCost /= j;
-				System.out.printf("Average cost over last %d batches is %.5f\n", j, averageCost);
+				baseLr *= decayRate;
 				System.out.printf("learning rate reduced to %f after %d batches\n", baseLr, i);
 				j = 0;
-				averageCost = 0;
 			}
 			updateWeights(baseLr, momentum);	
 			//////////////////////////
@@ -159,13 +204,10 @@ public class MultiLayerPerceptron {
 			OpenCL.releaseAll();
 		}
 	}
-	/**
-	 * Compute cost with activation computed in fordwardPass.
-	 * cost function used: logistic regression cost function without regularization.
-	 * J = -sum(y*log(a)+(1-y)*log(1-a))/m, where y is class label, a is sigmoid activation, 
-	 * m is the number of samples. 
-	 * @return the sum of cost of all output nodes
+	/* (non-Javadoc)
+	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#getCost(float[])
 	 */
+	@Override
 	public float getCost(float[] labels) {
 		float[] activations = outputLayer.getActivations();
 		if (activations.length != labels.length) {
@@ -180,7 +222,17 @@ public class MultiLayerPerceptron {
 //				singleCost += labels[j * labelSize + i] * log(activations[j * labelSize + i]) + 
 //						(1 - labels[j * labelSize + i]) * log(1 - activations[j * labelSize + i]);
 				//the above formula could produce NaN when activation == 1
+				/************************************************
+				 * Compute cost with activation computed in fordwardPass.
+				 * cost function used: logistic regression cost function without regularization.
+				 * J = -sum(y*log(a)+(1-y)*log(1-a))/m, where y is class label, a is sigmoid activation, 
+				 * m is the number of samples. 
+				 * 
+				 ************************************************/
 				singleCost += (labels[j * labelSize + i] == 1) ? log(activations[j * labelSize + i]) : log(1 - activations[j * labelSize + i]);
+				/************************************************
+				 * MSE cost
+				 ************************************************/
 //				singleCost += -0.5*pow(labels[j * labelSize + i] - activations[j * labelSize + i], 2);
 			}
 			result -= singleCost/batchSize;

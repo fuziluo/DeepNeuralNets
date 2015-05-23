@@ -153,8 +153,7 @@ public class FullyConnectedLayer implements Layer{
 			int[] arg3 = new int[] {batchSize};
 			int[] arg4 = new int[] {previousLayer.getNumOfNodes()};
 			int[] arg5 = new int[] {numOfPerceptron};
-			int nextWeightsDim = addBias? (previousLayer.getNumOfNodes() + 1) : previousLayer.getNumOfNodes();
-			int[] arg6 = new int[] {nextWeightsDim};
+			int[] arg6 = new int[] {weightsDim};
 			cl_mem arg7 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, previousLayer.getActivations().length* Sizeof.cl_float, Pointer.to(previousLayer.getActivations()), null);
 			//set arguments
 			clSetKernelArg(kernel0, 0, Sizeof.cl_mem, Pointer.to(arg0));
@@ -167,7 +166,7 @@ public class FullyConnectedLayer implements Layer{
 			clSetKernelArg(kernel0, 7, Sizeof.cl_mem, Pointer.to(arg7));
 			//enqueues a command to execute a kernel on a device
 	        groupSize = OpenCL.getPreferredGroupSize()[0];
-	    	global_work_size = new long[] {(long) ceil((min(batchSize, 8192))/(2.0 * groupSize)) * groupSize, (long) ceil((min(numOfPerceptron, 8192))/(2.0 * groupSize)) * groupSize};
+	    	global_work_size = new long[] {(long) ceil((min(batchSize, 8192))/(2.0 * groupSize)) * groupSize, (long) ceil((min(previousLayer.getNumOfNodes(), 8192))/(2.0 * groupSize)) * groupSize};
 	        local_work_size = new long[] {groupSize, groupSize};
 			clEnqueueNDRangeKernel(commandQueue, kernel0, 2, null, global_work_size, local_work_size, 0, null, null);
 			//decrements the kernel reference count

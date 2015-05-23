@@ -13,6 +13,7 @@ import org.junit.Test;
 import com.changjinxiong.deepneuralnets.nn.FullyConnectedLayer;
 import com.changjinxiong.deepneuralnets.nn.Layer;
 import com.changjinxiong.deepneuralnets.nn.MultiLayerPerceptron;
+import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
 /**
  * 
  * @author jxchang
@@ -39,7 +40,7 @@ public class TestMLP {
 	@Test
 	public void testWeightsSize() {
 		//check weights
-		MultiLayerPerceptron mlp = new MultiLayerPerceptron(new int[]{10,20,30,20,10,1}, true);
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{10,20,30,20,10,1}, true);
 		assertEquals(mlp.getInputLayer().getNextLayer().getWeight().length, 11*20, 0);
 		assertEquals(mlp.getInputLayer().getNextLayer().getNextLayer().getWeight().length, 21*30, 0);
 		assertEquals(mlp.getOutputLayer().getPreviousLayer().getPreviousLayer().getWeight().length, 31*20, 0);
@@ -49,7 +50,7 @@ public class TestMLP {
 	@Test
 	public void testForwardPass() {
 		//check forward pass without bias
-		MultiLayerPerceptron mlp = new MultiLayerPerceptron(new int[]{2,2,1}, false);
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{2,2,1}, false);
 		Layer l3 = mlp.getOutputLayer();
 		Layer l2 = mlp.getOutputLayer().getPreviousLayer();
 		Layer l1 = mlp.getInputLayer();
@@ -118,7 +119,7 @@ public class TestMLP {
 	@Test
 	public void testBackpropagation() {
 		
-		MultiLayerPerceptron mlp = new MultiLayerPerceptron(new int[]{2,2,1}, true);
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{2,2,1}, true);
 		Layer l3 = mlp.getOutputLayer();
 		Layer l2 = mlp.getOutputLayer().getPreviousLayer();
 		Layer l1 = mlp.getInputLayer();
@@ -151,7 +152,7 @@ public class TestMLP {
 	@Test
 	public void testBackpropagationBatch() {
 		
-		MultiLayerPerceptron mlp = new MultiLayerPerceptron(new int[]{2,42,2}, true);
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{2,42,2}, true);
 		Layer l3 = mlp.getOutputLayer();
 		Layer l2 = mlp.getOutputLayer().getPreviousLayer();
 		Layer l1 = mlp.getInputLayer();
@@ -216,7 +217,7 @@ public class TestMLP {
 		System.out.println(Arrays.toString(g1));
 //		System.out.println(Arrays.toString(w1));
 		
-		MultiLayerPerceptron mlp1 = new MultiLayerPerceptron(new int[]{2,42,2}, true);
+		NeuralNetwork mlp1 = new MultiLayerPerceptron(new int[]{2,42,2}, true);
 		l3 = mlp1.getOutputLayer();
 		l2 = mlp1.getOutputLayer().getPreviousLayer();
 		l1 = mlp1.getInputLayer();
@@ -244,7 +245,7 @@ public class TestMLP {
 	
 	@Test
 	public void gradientCheck() {
-		MultiLayerPerceptron mlp = new MultiLayerPerceptron(new int[]{784,300,10}, true);
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{784,300,10}, true);
 		Layer l3 = mlp.getOutputLayer();
 		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", 1, false);
 //		float[] tin = {	0.1f, 0.2f, 0.3f, 1,
