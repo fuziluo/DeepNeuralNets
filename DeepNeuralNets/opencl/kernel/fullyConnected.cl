@@ -9,7 +9,6 @@ __kernel void weightedSumSigmoid(__global float *preActivations, __global float 
     __local float shared_B[2 * groupSize][2 * groupSize];
     int N = activationDim;
 
-    // #define floord(n,d) (((n)<0) ? -((-(n)+(d)-1)/(d)) : (n)/(d))
     #define min(x,y)    ((x) < (y) ? (x) : (y))
     for (int i = 2 * groupSize * gid0; i < batchSize; i += 8192)
       for (int j = 2 * groupSize * gid1; j < numOfPerceptrons; j += 8192) {
@@ -169,13 +168,13 @@ __kernel void weightedSumBackPropSigmoidUpdateGradients(__global float *error, _
         }
         if (weightsDim >= j + 1 && numOfPerceptrons >= i + 1)
           if (weightsDim >= lid1 + j + 1 && weightsDim >= lid1 + j + 1 && numOfPerceptrons >= lid0 + i + 1 && numOfPerceptrons >= lid0 + i + 1) {
-            gradients[(lid0 + i) * weightsDim + (lid1 + j)] = private_C[0][0];
+            gradients[(lid0 + i) * weightsDim + (lid1 + j)] = private_C[0][0] / batchSize;
             if (weightsDim >= lid1 + j + groupSize + 1 && weightsDim >= lid1 + j + groupSize + 1)
-              gradients[(lid0 + i) * weightsDim + (lid1 + j + groupSize)] = private_C[0][1];
+              gradients[(lid0 + i) * weightsDim + (lid1 + j + groupSize)] = private_C[0][1] / batchSize;
             if (numOfPerceptrons >= lid0 + i + groupSize + 1 && numOfPerceptrons >= lid0 + i + groupSize + 1) {
-              gradients[(lid0 + i + groupSize) * weightsDim + (lid1 + j)] = private_C[1][0];
+              gradients[(lid0 + i + groupSize) * weightsDim + (lid1 + j)] = private_C[1][0] / batchSize;
               if (weightsDim >= lid1 + j + groupSize + 1 && weightsDim >= lid1 + j + groupSize + 1)
-                gradients[(lid0 + i + groupSize) * weightsDim + (lid1 + j + groupSize)] = private_C[1][1];
+                gradients[(lid0 + i + groupSize) * weightsDim + (lid1 + j + groupSize)] = private_C[1][1] / batchSize;
             }
           }
         barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);

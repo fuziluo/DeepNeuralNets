@@ -79,7 +79,7 @@ public class FullyConnectedLayer implements Layer{
 		if (previousLayer == null) {
 			throw new IllegalStateException("Cannot set weight on input layer!");
 		}
-		if (this.weights.length != weights.length) {
+		if (this.weights != null && this.weights.length != weights.length) {
 			throw new IllegalArgumentException("weights size does not match!");
 		}
 		this.weights = weights;
@@ -199,6 +199,7 @@ public class FullyConnectedLayer implements Layer{
 				for (int k = 0; k < batchSize; k++) {
 					gradients[i * weightDim + j] += errors[k * numOfPerceptron + i] * previousLayer.getActivations()[k * weightDim + j];
 				}
+				gradients[i * weightDim + j] /= batchSize;
 			}
 		}	
 		if (previousLayer.getPreviousLayer() != null) {

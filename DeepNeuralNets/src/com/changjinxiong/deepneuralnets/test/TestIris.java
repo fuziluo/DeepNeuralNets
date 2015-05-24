@@ -72,7 +72,7 @@ public class TestIris {
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{4,33,3}, true); //overfitting
 		int batchSize = 150;
 		IrisDataProvider tp = new IrisDataProvider(batchSize, false);
-		mlp.train(tp, costType, 0.005f, 0.0f, 0, 0, 10000, openCL);
+		mlp.train(tp, costType, 0.5f, 0.0f, 0, 0, 10000, openCL);
 		//test
 		IrisDataProvider tp1 = new IrisDataProvider(150, false);
 		float errorRate = mlp.test(tp1, false);

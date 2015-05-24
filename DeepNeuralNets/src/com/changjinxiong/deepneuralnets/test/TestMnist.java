@@ -34,7 +34,7 @@ public class TestMnist {
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{784,300,10}, true); 
 //		mlp.test(mnistTraining, useOpenCL);
 //		mlp.test(mnistTest, useOpenCL);
-		mlp.train(mnistTraining, costType, 0.005f, 0.9f, mnistTraining.getDatasetSize() / mnistTraining.getBatchSize(), 0.8f, 1, useOpenCL);
+		mlp.train(mnistTraining, costType, 0.5f, 0.9f, mnistTraining.getDatasetSize() / mnistTraining.getBatchSize(), 0.8f, 1, useOpenCL);
 //		mlp.test(mnistTraining, useOpenCL);
 		float errorRate = mlp.test(mnistTest, useOpenCL);
 		assertEquals(0, errorRate, 0.05);
