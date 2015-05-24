@@ -12,7 +12,11 @@ import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 import static java.lang.Math.*;
 
 /**
- * A fully connected layer in MLP
+ * A fully connected layer
+ * Can be used in MLP or ConvNet. 
+ * If used in ConvNet, currently the network accepts only fixed size input.
+ * This can be improved in the future by refining the handling of calculation, essentially
+ * in a manner similar to convolutional layer. (1x1 convolution).
  * @author jxchang
  *
  */
@@ -23,8 +27,8 @@ public class FullyConnectedLayer implements Layer{
 	private float[] weights; //the weights used to compute activations of this layer
 	private float[] errors; //error used for calculating gradients in backpropagation, get from next layer or set by MLP
 	private float[] prevErrors; // error in the previous layer, calculated in this layer
-	private final float[] gradients; 
-	private final float[] weightsUpdate; 	
+	private float[] gradients; 
+	private float[] weightsUpdate; 	
 	private final Layer previousLayer;
 	private Layer nextLayer;
 	private int batchSize = 1; //batch size could change in different calculation
@@ -39,12 +43,14 @@ public class FullyConnectedLayer implements Layer{
 		this.nextLayer = nextLayer;
 		
 		if (previousLayer != null) { 
-			int weightLength = previousLayer.getNumOfNodes() + (addBias ? 1 : 0);
-			weights = new float[numOfPerceptron * weightLength];
-			//randomly initialize weights
-			initializeWeights(weights);
-			gradients = new float[weights.length];
-			weightsUpdate = new float[weights.length];
+			if (previousLayer instanceof FullyConnectedLayer) {
+				int weightLength = previousLayer.getNumOfNodes() + (addBias ? 1 : 0);
+				weights = new float[numOfPerceptron * weightLength];
+				//randomly initialize weights
+				initializeWeights(weights);
+				gradients = new float[weights.length];
+				weightsUpdate = new float[weights.length];
+			}
 		} else {
 			weights = null;
 			gradients = null;
@@ -174,6 +180,7 @@ public class FullyConnectedLayer implements Layer{
 			//wait until all previously queued OpenCL commands in command_queue are issued to the associated device and have completed
 			clFinish(commandQueue);
 			//read data from GPU
+			//TODO can be improve in future so that mem object can be passed to previous layer
 			clEnqueueReadBuffer(commandQueue, arg2, CL_TRUE, 0, prevErrors.length * Sizeof.cl_float, Pointer.to(prevErrors), 0, null, null);
 			//cleanup work
 //			clReleaseMemObject(arg0);
@@ -227,10 +234,10 @@ public class FullyConnectedLayer implements Layer{
 			throw new IllegalStateException("Only allow to set activations on input layer!");
 		}
 
-		if (inputs.length != (numOfPerceptron + (addBiasNode() ? 1 : 0)) * batchSize) {
+		if (inputs.length % (numOfPerceptron + (addBiasNode() ? 1 : 0)) != 0) {
 			throw new IllegalArgumentException("inputs size error!");
 		}
-//		batchSize = activations.length / (numOfPerceptron + (addBiasNode() ? 1 : 0));
+		this.batchSize = inputs.length / (numOfPerceptron + (addBiasNode() ? 1 : 0));
 		this.activations = inputs;
 		
 	}
@@ -241,6 +248,16 @@ public class FullyConnectedLayer implements Layer{
 			throw new IllegalStateException("Not forward pass calculation on input layer!");
 		}
 		batchSize = previousLayer.getBatchSize(); //update batch size
+		
+		//For the case when previous layer is a feature map, where the size of output is unknown until input is fed
+		if (weights == null) {
+			int weightLength = previousLayer.getNumOfNodes() + (addBias ? 1 : 0);
+			weights = new float[numOfPerceptron * weightLength];
+			//randomly initialize weights
+			initializeWeights(weights);
+			gradients = new float[weights.length];
+			weightsUpdate = new float[weights.length];
+		}
 
 		activations = new float[batchSize * (numOfPerceptron + (addBiasNode() ? 1 : 0))];
 
@@ -249,7 +266,6 @@ public class FullyConnectedLayer implements Layer{
 		} else {
 			forwardPassNoAcc();
 		}
-//		System.out.println(Arrays.toString(activations));
 	}
 
 	private void forwardPassOpenCL() {
@@ -373,16 +389,16 @@ public class FullyConnectedLayer implements Layer{
 		return batchSize;
 	}
 
-	@Override
-	public void setInputShape(int[] inputShape) {
-		if (previousLayer != null) { //not input layer
-			throw new IllegalStateException("only allow to set batch size on input layer!");
-		}		
-		if (inputShape.length != 1) {
-			throw new IllegalArgumentException("Fully connected layer has only one shape parameter");
-		}
-		this.batchSize = inputShape[0];
-	}
+//	@Override
+//	public void setInputShape(int[] inputShape) {
+//		if (previousLayer != null) { //not input layer
+//			throw new IllegalStateException("only allow to set batch size on input layer!");
+//		}		
+//		if (inputShape.length != 1) {
+//			throw new IllegalArgumentException("Fully connected layer has only one shape parameter");
+//		}
+//		this.batchSize = inputShape[0];
+//	}
 
 	@Override
 	public int getNumOfNodes() {
@@ -401,11 +417,9 @@ public class FullyConnectedLayer implements Layer{
 		if (previousLayer == null) { 
 			throw new IllegalStateException("Not allowed to update weight on input layer!");
 		}
-//		System.out.println(Arrays.toString(gradients));
 		for (int i = 0; i < weights.length; i++) {
 			weightsUpdate[i] = momentum * weightsUpdate[i] - learningRate * gradients[i];
 			weights[i] += weightsUpdate[i];
-//			System.out.println(weights[i]+" "+learningRate+" "+gradients[i]);
 			gradients[i] = 0;
 		}
 	}

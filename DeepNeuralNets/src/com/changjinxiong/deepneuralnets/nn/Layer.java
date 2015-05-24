@@ -21,7 +21,6 @@ public interface Layer {
 	public void setErrors(float[] error);
 	public float[] getGradients();
 	public int getBatchSize();
-	public void setInputShape(int[] inputShape);
 	public boolean hasBias();
 	public int getNumOfNodes();
 }
