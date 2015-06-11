@@ -44,18 +44,20 @@ public class TestIris {
 	}
 	@Test
 	public void testOpenCL() {
+		boolean useOpenCL = false;
 		int batchSize = 33;
 		//without OpenCL
-		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{4,32,3}, true); //overfitting
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{4,32,3}, true, useOpenCL); //overfitting
 		IrisDataProvider tp = new IrisDataProvider(batchSize, false);
-		mlp.train(tp, 0, 0.005f, 0, 0, 0, 1, false);
+		mlp.train(tp, 0, 0.005f, 0, 0, 0, 1);
 		float[] t = tp.getNextBatchLabel();
 		float c1 = mlp.getCost(t, 0);
 
 		//with OpenCL
-		mlp = new MultiLayerPerceptron(new int[]{4,32,3}, true); //overfitting
+		useOpenCL = true;
+		mlp = new MultiLayerPerceptron(new int[]{4,32,3}, true, useOpenCL); //overfitting
 		IrisDataProvider tp1 = new IrisDataProvider(batchSize, false);
-		mlp.train(tp1, 0, 0.005f, 0, 0, 0, 1, true);
+		mlp.train(tp1, 0, 0.005f, 0, 0, 0, 1);
 		float[] t1 = tp1.getNextBatchLabel();
 		float c2 = mlp.getCost(t1, 0);
 		
@@ -67,15 +69,15 @@ public class TestIris {
 	}
 	@Test
 	public void test() {
-		boolean openCL = true;
+		boolean useOpenCL = true;
 		int costType = 0; //cross entropy
-		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{4,33,3}, true); //overfitting
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{4,33,3}, true, useOpenCL); //overfitting
 		int batchSize = 150;
 		IrisDataProvider tp = new IrisDataProvider(batchSize, false);
-		mlp.train(tp, costType, 0.5f, 0.0f, 0, 0, 10000, openCL);
+		mlp.train(tp, costType, 0.5f, 0.0f, 0, 0, 10000);
 		//test
 		IrisDataProvider tp1 = new IrisDataProvider(150, false);
-		float errorRate = mlp.test(tp1, false);
+		float errorRate = mlp.test(tp1);
 		assertEquals(0, errorRate, 0.01);
 
 	}

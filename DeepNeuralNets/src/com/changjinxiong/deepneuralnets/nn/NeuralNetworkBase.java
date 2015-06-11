@@ -4,6 +4,8 @@ import static java.lang.Math.log;
 import static java.lang.Math.pow;
 
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 import com.changjinxiong.deepneuralnets.test.DataProvider;
@@ -12,7 +14,12 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	protected Layer inputLayer = null;
 	protected Layer outputLayer = null;
 	protected boolean addBias;
+	protected final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getName()); 
 
+	@Override
+	protected void finalize() {
+		OpenCL.releaseAll();
+	}
 	/* (non-Javadoc)
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#getInputLayer()
 	 */
@@ -31,23 +38,23 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#fordwardPass(float[], int, boolean)
 	 */
 	@Override
-	public void fordwardPass(float[] inputSamples, boolean useOpenCL) {
+	public void fordwardPass(float[] inputSamples) {
 		inputLayer.setInputs(inputSamples); //provide input data
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
 			currentLayer = currentLayer.getNextLayer();
-			currentLayer.forwardPass(useOpenCL);
+			currentLayer.forwardPass();
 		}
 	}
 	/* (non-Javadoc)
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#backPropagation(float[], boolean)
 	 */
 	@Override
-	public void backPropagation(float[] labels, int costType, boolean useOpenCL) {
+	public void backPropagation(float[] labels, int costType) {
 		setError(labels, costType);
 		Layer currentLayer = outputLayer;
 		while (currentLayer.getPreviousLayer() != null) {
-			currentLayer.backpropagation(useOpenCL);
+			currentLayer.backpropagation();
 			currentLayer = currentLayer.getPreviousLayer();
 		}		
 	}
@@ -100,12 +107,12 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#test(com.changjinxiong.deepneuralnets.test.DataProvider, boolean)
 	 */
 	@Override
-	public float test(DataProvider dp, boolean useOpenCL) {
+	public float test(DataProvider dp) {
 		int testNum = 0;
 		ArrayList<Float> testResult = new ArrayList<Float>();
 		ArrayList<Float> labels = new ArrayList<Float>();
 		for ( ; testNum < dp.getDatasetSize(); testNum += dp.getBatchSize()) {
-			fordwardPass(dp.getNextbatchInput(addBias), useOpenCL);
+			fordwardPass(dp.getNextbatchInput(addBias));
 			for (float a : getOutputLayer().getActivations()) {
 				testResult.add(a);
 			}
@@ -113,9 +120,9 @@ public class NeuralNetworkBase implements NeuralNetwork {
 				labels.add(l);
 			}
 		}
-		if (useOpenCL) {
-			OpenCL.releaseAll();
-		}
+//		if (useOpenCL) {
+//			cleanOpenCLKernels();
+//		}
 		Float[] a = new Float[testNum * dp.getLabelDimension()];
 		a = testResult.toArray(a);
 		Float[] t = new Float[testNum * dp.getLabelDimension()];
@@ -138,7 +145,8 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		}
 		
 		float errorRate = count/testNum;
-		System.out.printf("%.0f out of %d wrong. Error rate is %.2f\n", count, testNum, errorRate);
+		LOGGER.log(Level.INFO, "{0} out of {1} wrong. Error rate is {2}\n", new Object[] {count, testNum, errorRate} );
+//		System.out.printf("%.0f out of %d wrong. Error rate is %.2f\n", count, testNum, errorRate);
 		return errorRate;
 	}
 	/* (non-Javadoc)
@@ -146,7 +154,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	 */
 	@Override
 	public void train(DataProvider dp, int costType, float learningRate, float momentum, 
-			 int decayCycle, float decayRate, int maxEpoch, boolean useOpenCL) {
+			 int decayCycle, float decayRate, int maxEpoch) {
 		if (costType < 0 || costType > 1) {
 			throw new IllegalArgumentException("Wrong cost type");
 		}
@@ -166,11 +174,11 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		float baseLr = learningRate;
 		float averageCost = 0;
 		for (int i = 0, j = 0, k = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize(), j++, k++) {
-			fordwardPass(dp.getNextbatchInput(addBias), useOpenCL);
+			fordwardPass(dp.getNextbatchInput(addBias));
 			//monitor the cost
 			float [] batchLabels = dp.getNextBatchLabel();
 			float cost = getCost(batchLabels, costType);
-			backPropagation(batchLabels, costType, useOpenCL);
+			backPropagation(batchLabels, costType);
 			averageCost += cost;
 			if (k >= dp.getDatasetSize() / dp.getBatchSize()) {
 				averageCost /= k;
@@ -185,9 +193,9 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			}
 			updateWeights(baseLr, momentum);	
 		}
-		if (useOpenCL) {
-			OpenCL.releaseAll();
-		}
+//		if (useOpenCL) {
+//			cleanOpenCLKernels();
+//		}
 	}
 	/* (non-Javadoc)
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#getCost(float[])
@@ -235,5 +243,15 @@ public class NeuralNetworkBase implements NeuralNetwork {
 
 		return result;
 	}
+//	@Override
+//	public void cleanOpenCLKernels() {
+//		// TODO Auto-generated method stub
+//		Layer layer = inputLayer;
+//		while (layer.getNextLayer() != null) {
+//			layer = layer.getNextLayer();
+//			layer.cleanOpenCLKernels();
+//		}
+//		OpenCL.releaseAll();		
+//	}
 
 }

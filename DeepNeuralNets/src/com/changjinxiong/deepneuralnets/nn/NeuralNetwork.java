@@ -8,18 +8,20 @@ public interface NeuralNetwork {
 
 	public Layer getOutputLayer();
 
-	public void fordwardPass(float[] inputSamples, boolean useOpenCL);
+	public void fordwardPass(float[] inputSamples);
 
-	public void backPropagation(float[] labels, int costType, boolean useOpenCL);
+	public void backPropagation(float[] labels, int costType);
 
 	public void updateWeights(float learningRate, float momentum);
 
-	public float test(DataProvider dp, boolean useOpenCL);
+	public float test(DataProvider dp);
 
 	public void train(DataProvider dp, int costType, float learningRate, float momentum, int decayCycle, float decayRate,
-			int maxEpoch, boolean useOpenCL);
+			int maxEpoch);
 	public float getCost(float[] labels, int costType);
 
 	public void setError(float[] labels, int costType);
+	
+//	public void cleanOpenCLKernels();
 
 }
