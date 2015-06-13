@@ -58,7 +58,7 @@ public class MnistDataProvider implements DataProvider {
 		for (int i = 0; i < batchSize; i++) {
 			//image data
 		    try {
-				images.seek(16 + dataSize * currentIndex);
+				images.seek(16 + dataSize * indexSeq.get(currentIndex));
 				images.readFully(currentImage);
 			    for (int j = 0; j < dataSize; j++) {
 			    	result[i * dataSizeWithBias + j] = (currentImage[j] & 0xFF)/255.0f;

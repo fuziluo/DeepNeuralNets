@@ -96,11 +96,11 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#updateWeights(float, float)
 	 */
 	@Override
-	public void updateWeights(float learningRate, float momentum) {
+	public void updateWeights(float learningRate, float momentum, float weightDecay) {
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
 			currentLayer = currentLayer.getNextLayer();
-			currentLayer.updateWeights(learningRate, momentum);
+			currentLayer.updateWeights(learningRate, momentum, weightDecay);
 		}
 	}
 	/* (non-Javadoc)
@@ -120,9 +120,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 				labels.add(l);
 			}
 		}
-//		if (useOpenCL) {
-//			cleanOpenCLKernels();
-//		}
+
 		Float[] a = new Float[testNum * dp.getLabelDimension()];
 		a = testResult.toArray(a);
 		Float[] t = new Float[testNum * dp.getLabelDimension()];
@@ -153,8 +151,8 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#train(com.changjinxiong.deepneuralnets.test.DataProvider, float, float, int, boolean)
 	 */
 	@Override
-	public void train(DataProvider dp, int costType, float learningRate, float momentum, 
-			 int decayCycle, float decayRate, int maxEpoch) {
+	public void train(DataProvider dp, int costType, float learningRate, float momentum, float weightDecay, 
+			 int lrChangCycle, float lrChangRate, int maxEpoch) {
 		if (costType < 0 || costType > 1) {
 			throw new IllegalArgumentException("Wrong cost type");
 		}
@@ -164,15 +162,17 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		if (momentum < 0) {
 			throw new IllegalArgumentException("momentum cannot be negtive");
 		}
-		if (decayCycle < 0) {
-			throw new IllegalArgumentException("decayCycle cannot be negtive");
+		if (lrChangCycle < 0) {
+			throw new IllegalArgumentException("lrChangCycle cannot be negtive");
 		}
-		if (decayCycle > 0 && (decayRate <= 0 || decayRate >= 1)) {
-			throw new IllegalArgumentException("decayRate should be within (0, 1)");
+		if (lrChangCycle > 0 && (lrChangRate <= 0 || lrChangRate >= 1)) {
+			throw new IllegalArgumentException("lrChangRate should be within (0, 1)");
 		}
 		dp.reset();
 		float baseLr = learningRate;
 		float averageCost = 0;
+		int lrDecayTimesLimit = 1;
+		int lrDecayTimes = 0;
 		for (int i = 0, j = 0, k = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize(), j++, k++) {
 			fordwardPass(dp.getNextbatchInput(addBias));
 			//monitor the cost
@@ -182,16 +182,19 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			averageCost += cost;
 			if (k >= dp.getDatasetSize() / dp.getBatchSize()) {
 				averageCost /= k;
-				System.out.printf("Average cost over last %d batches is %.5f\n", k, averageCost);
+				LOGGER.log(Level.INFO, "Average cost over last {0} batches is {1}", new Object[] {k, averageCost});
+//				System.out.printf("Average cost over last %d batches is %.5f\n", k, averageCost);
 				k = 0;
 				averageCost = 0;
 			}
-			if (decayCycle > 0 && j >= decayCycle) {
-				baseLr *= decayRate;
-				System.out.printf("learning rate reduced to %f after %d batches\n", baseLr, i);
+			if (lrChangCycle > 0 && j >= lrChangCycle && lrDecayTimes < lrDecayTimesLimit) {
+				baseLr *= lrChangRate;
+				LOGGER.log(Level.INFO, "learning rate reduced to {0} after {1} batches", new Object[] {baseLr, i});
+//				System.out.printf("learning rate reduced to %f after %d batches\n", baseLr, i);
 				j = 0;
+				lrDecayTimes++;
 			}
-			updateWeights(baseLr, momentum);	
+			updateWeights(baseLr, momentum, weightDecay);	
 		}
 //		if (useOpenCL) {
 //			cleanOpenCLKernels();
@@ -243,15 +246,17 @@ public class NeuralNetworkBase implements NeuralNetwork {
 
 		return result;
 	}
-//	@Override
-//	public void cleanOpenCLKernels() {
-//		// TODO Auto-generated method stub
-//		Layer layer = inputLayer;
-//		while (layer.getNextLayer() != null) {
-//			layer = layer.getNextLayer();
-//			layer.cleanOpenCLKernels();
-//		}
-//		OpenCL.releaseAll();		
-//	}
+
+
+	@Override
+	public void saveWeights(String path) {
+		// TODO Auto-generated method stub
+		
+	}
+	@Override
+	public void loadWeights(String path) {
+		// TODO Auto-generated method stub
+		
+	}
 
 }

@@ -8,7 +8,7 @@ import org.jocl.cl_mem;
  *
  */
 public interface Layer {
-	public void updateWeights(float learningRate, float momentum);
+	public void updateWeights(float learningRate, float momentum, float weightDecay);
 	public void setWeight(float[] weights);	
 	public void backpropagation(); //training
 	public void setInputs(float[] inputs);

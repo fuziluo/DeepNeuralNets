@@ -186,19 +186,22 @@ __kernel void weightedSumBackPropSigmoidUpdateGradients(__global float *error, _
         barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
       }
 }
-__kernel void updateWeights(__global float *gradients, __global float *weights, __global float *weightsUpdate, float learningRate, float momentum, int len)
+__kernel void updateWeights(__global float *gradients, __global float *weights, __global float *weightsUpdate, float learningRate, float momentum, float weightDecay_batchSize, int len)
 {
     int b0 = get_group_id(0);
     int t0 = get_local_id(0);
+    float private_weights[1];
     float private_weightsUpdate[1];
 
-    //#define floord(n,d) (((n)<0) ? -((-(n)+(d)-1)/(d)) : (n)/(d))
+    #define floord(n,d) (((n)<0) ? -((-(n)+(d)-1)/(d)) : (n)/(d))
     for (int c0 = 128 * b0; c0 < len; c0 += 32768)
       if (len >= t0 + c0 + 1) {
+        private_weights[0] = weights[t0 + c0];
         private_weightsUpdate[0] = weightsUpdate[t0 + c0];
-        private_weightsUpdate[0] = ((momentum * private_weightsUpdate[0]) - (learningRate * gradients[t0 + c0]));
-        weights[t0 + c0] += private_weightsUpdate[0];
+        private_weightsUpdate[0] = (((momentum * private_weightsUpdate[0]) - (learningRate * gradients[t0 + c0])) - ((learningRate * weightDecay_batchSize) * private_weights[0]));
+        private_weights[0] += private_weightsUpdate[0];
         weightsUpdate[t0 + c0] = private_weightsUpdate[0];
+        weights[t0 + c0] = private_weights[0];
       }
 }
 
