@@ -12,13 +12,15 @@ import com.changjinxiong.deepneuralnets.nn.FeatureMapLayer;
 import com.changjinxiong.deepneuralnets.nn.Layer;
 import com.changjinxiong.deepneuralnets.nn.MultiLayerPerceptron;
 import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
+import com.changjinxiong.deepneuralnets.test.CIFAR10DataProvider.DatasetType;
 
 public class TestCNN {
 
 	@Test
 	public void testConvLayerForward() {
-		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false);
-		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 1, cl1, null, true);
+		boolean useOpenCL = false;
+		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false, useOpenCL);
+		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 1, cl1, null, true, useOpenCL);
 		cl1.setNextLayer(cl2);
 		int[] inputShape = {3, 3};
 		cl1.setInputShape(inputShape);
@@ -42,7 +44,7 @@ public class TestCNN {
 							0.8f, 0.9f, 1,
 							};
 		cl2.setWeight(weights);
-		cl2.forwardPass(false);
+		cl2.forwardPass();
 		float[] act = cl2.getActivations();
 		float[] actCorrect = {	2.74f, 2.94f, 
 								3.34f, 3.54f, 
@@ -62,8 +64,9 @@ public class TestCNN {
 
 	@Test
 	public void testConvLayerForward1() {
-		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false);
-		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 2, cl1, null, true);
+		boolean useOpenCL = false;
+		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false, useOpenCL);
+		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 2, cl1, null, true, useOpenCL);
 		cl1.setNextLayer(cl2);
 		int[] inputShape = {3, 5};
 		cl1.setInputShape(inputShape);
@@ -87,7 +90,7 @@ public class TestCNN {
 							0.8f, 0.9f, 1,
 							};
 		cl2.setWeight(weights);
-		cl2.forwardPass(false);
+		cl2.forwardPass();
 		float[] act = cl2.getActivations();
 		float[] actCorrect = {	2.74f, 2.9f, 
 								6.94f, 7.5f, 
@@ -107,7 +110,7 @@ public class TestCNN {
 		int[][] para = {{2, 0, 0, 0}, {4, 3, 3, 1}, {3, 2, 2, 2}, {4}, {5}};
 		boolean addBias = true;
 		boolean useOpenCL = false;
-		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias);
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
@@ -142,7 +145,7 @@ public class TestCNN {
 		};
 		int[] inputShape = {4, 4};
 		cnn.setInputShape(inputShape);
-		cnn.fordwardPass(testInput, useOpenCL);
+		cnn.fordwardPass(testInput);
 		assertEquals(l4.getWeight().length, 16, 0);
 		float[] act = l5.getActivations();
 //		System.out.println(Arrays.toString(act));
@@ -153,7 +156,7 @@ public class TestCNN {
 		int[][] para = {{2, 0, 0, 0}, {2, 3, 3, 1}, {4}};
 		boolean addBias = true;
 		boolean useOpenCL = false;
-		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias);
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
@@ -199,7 +202,7 @@ public class TestCNN {
 								0.6229384f, 0.81499475f, 0.9215472f, 0.96906114f
 		};
 		
-		cnn.fordwardPass(testInput, useOpenCL);
+		cnn.fordwardPass(testInput);
 		assertEquals(l3.getWeight().length, 36, 0);
 		float[] act2 = l2.getActivations();
 		float[] act3 = l3.getActivations();
@@ -211,22 +214,27 @@ public class TestCNN {
 
 	@Test
 	public void gradientCheck() {
-		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {10}};
+//		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
+		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = false;
-		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias);
+		int batchSize = 100;
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
-		cnn.setInputShape(new int[] {28, 28});
-		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", 10, false);
+//		cnn.setInputShape(new int[] {28, 28});
+//		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
+		cnn.setInputShape(new int[] {32, 32});
+		CIFAR10DataProvider tp = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
 
-		float[] tin = mnistTraining.getNextbatchInput(false);
+		
+		float[] tin = tp.getNextbatchInput();
 
-		float[] tout = mnistTraining.getNextBatchLabel();
-		cnn.fordwardPass(tin, false);
+		float[] tout = tp.getNextBatchLabel();
+		cnn.fordwardPass(tin);
 //		float c1 = mlp.getCost(tout);
-		cnn.backPropagation(tout, 0, false);
+		cnn.backPropagation(tout, 0);
 		int i = 0;
 		Layer l = l2;
 		float g1 = l.getGradients()[i];
@@ -234,19 +242,19 @@ public class TestCNN {
 		double e = 0.005f;
 		l.getWeight()[i] = (float) (w - e);
 //		System.out.println(l.getWeight()[i]);
-		cnn.fordwardPass(tin, false);
+		cnn.fordwardPass(tin);
 		float c1 = cnn.getCost(tout, 0);
 //		System.out.println(Arrays.toString(l.getWeight()));
 //		System.out.println(l.getWeight()[i]);
 		l.getWeight()[i] = (float) (w + e);
 //		System.out.println(Arrays.toString(l.getWeight()));
 //		System.out.println(l.getWeight()[i]);
-		cnn.fordwardPass(tin, false);
+		cnn.fordwardPass(tin);
 		float c2 = cnn.getCost(tout, 0);
 		double g2 = (c2 - c1)/(2 * e);
 		System.out.println(c1+" "+c2);
 		System.out.println(g1+" "+g2);
-		assertEquals(g1/g2, 1, 0.001);
+		assertEquals(g1/g2, 1, 0.0015);
 
 	}
 	

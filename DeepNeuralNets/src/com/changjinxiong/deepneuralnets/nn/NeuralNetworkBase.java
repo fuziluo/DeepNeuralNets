@@ -2,7 +2,15 @@ package com.changjinxiong.deepneuralnets.nn;
 
 import static java.lang.Math.log;
 import static java.lang.Math.pow;
+import static java.nio.file.StandardOpenOption.*;
 
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -15,6 +23,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	protected Layer outputLayer = null;
 	protected boolean addBias;
 	protected final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getName()); 
+	protected float cost;
 
 	@Override
 	protected void finalize() {
@@ -109,10 +118,14 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	@Override
 	public float test(DataProvider dp) {
 		int testNum = 0;
+		boolean addBias = false;
+		if (this instanceof MultiLayerPerceptron) {
+			addBias = this.addBias;
+		}
 		ArrayList<Float> testResult = new ArrayList<Float>();
 		ArrayList<Float> labels = new ArrayList<Float>();
 		for ( ; testNum < dp.getDatasetSize(); testNum += dp.getBatchSize()) {
-			fordwardPass(dp.getNextbatchInput(addBias));
+			fordwardPass(dp.getNextbatchInput());
 			for (float a : getOutputLayer().getActivations()) {
 				testResult.add(a);
 			}
@@ -169,12 +182,16 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			throw new IllegalArgumentException("lrChangRate should be within (0, 1)");
 		}
 		dp.reset();
+		boolean addBias = false;
+		if (this instanceof MultiLayerPerceptron) {
+			addBias = this.addBias;
+		}
 		float baseLr = learningRate;
 		float averageCost = 0;
 		int lrDecayTimesLimit = 1;
 		int lrDecayTimes = 0;
 		for (int i = 0, j = 0, k = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize(), j++, k++) {
-			fordwardPass(dp.getNextbatchInput(addBias));
+			fordwardPass(dp.getNextbatchInput());
 			//monitor the cost
 			float [] batchLabels = dp.getNextBatchLabel();
 			float cost = getCost(batchLabels, costType);
@@ -204,6 +221,10 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#getCost(float[])
 	 */
 	@Override
+	public float getCost() {
+		return cost;
+	}
+	
 	public float getCost(float[] labels, int costType) {
 		float[] activations = outputLayer.getActivations();
 		if (activations.length != labels.length) {
@@ -243,20 +264,62 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		} else {
 			throw new IllegalArgumentException("Incorrect cost type!");
 		}
-
+		cost = result;
 		return result;
 	}
 
 
 	@Override
 	public void saveWeights(String path) {
-		// TODO Auto-generated method stub
-		
+//		String name = "." + this.getClass().getSimpleName() + ".weights";
+		try {
+			ByteChannel channel = Files.newByteChannel(Paths.get(path), WRITE, CREATE, TRUNCATE_EXISTING);
+//			FileChannel channel = new RandomAccessFile(Paths.get(path,".weights").toString(), "rw").getChannel();
+			Layer layer = inputLayer.getNextLayer();
+			int bufferSize = 0;
+			float weights[];
+			do {
+				weights = layer.getWeight();
+				bufferSize = 4 * weights.length;
+				ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+				buffer.asFloatBuffer().put(weights);
+				channel.write(buffer);
+				layer = layer.getNextLayer();
+			}
+			while (layer != null);
+			channel.close();
+			LOGGER.log(Level.INFO, "Weights saved to " + path);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	@Override
 	public void loadWeights(String path) {
-		// TODO Auto-generated method stub
-		
+//		String name = "." + this.getClass().getSimpleName() + ".weights";
+		try {
+			ByteChannel channel = Files.newByteChannel(Paths.get(path), READ);
+//			FileChannel channel = new RandomAccessFile(Paths.get(path,".weights").toString(), "rw").getChannel();
+			Layer layer = inputLayer.getNextLayer();
+			int bufferSize = 0;
+			float weights[];
+			do {
+				weights = layer.getWeight();
+				bufferSize = 4 * weights.length;
+				ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+				buffer.clear();
+				channel.read(buffer);
+				buffer.flip();
+				buffer.asFloatBuffer().get(weights);
+				layer.setWeight(weights);
+				layer = layer.getNextLayer();
+			}
+			while (layer != null);
+			channel.close();	
+			LOGGER.log(Level.INFO, "Weights loaded from " + path);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
 	}
 
 }

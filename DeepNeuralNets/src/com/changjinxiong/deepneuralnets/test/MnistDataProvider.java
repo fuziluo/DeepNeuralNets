@@ -48,11 +48,11 @@ public class MnistDataProvider implements DataProvider {
 	}
 
 	@Override
-	public float[] getNextbatchInput(boolean bias) {
+	public float[] getNextbatchInput() {
 		int dataSize = rows * cols;
-		int dataSizeWithBias = dataSize + (bias ? 1 : 0);
+		int dataSizeWithBias = dataSize ;
 	    byte[] currentImage = new byte[rows * cols];
-	    byte[] currentLabel = new byte[10]; 
+//	    byte[] currentLabel = new byte[10]; 
 		float[] result = new float[dataSizeWithBias * batchSize];
 		currentLabelsBatch = new float[10 * batchSize]; //10 kinds of digits
 		for (int i = 0; i < batchSize; i++) {
@@ -66,9 +66,9 @@ public class MnistDataProvider implements DataProvider {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-			if (bias) { //bias activation is always 1
-				result[i * dataSizeWithBias + dataSize] = 1;
-			}
+//			if (bias) { //bias activation is always 1
+//				result[i * dataSizeWithBias + dataSize] = 1;
+//			}
 			//label data
 			try {
 			    labels.seek(8 + currentIndex);

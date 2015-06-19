@@ -1,13 +1,13 @@
 //  #define groupSize 8
 
-__kernel void weightedSumSigmoid(__global float *preActivations, __global float *weights, __global float *activations, int batchSize, int numOfPerceptrons, int weightsDim, int activationDim)
+__kernel void weightedSumSigmoid(__global float *preActivations, __global float *weights, __global float *activations, int batchSize, int numOfPerceptrons, int weightsDim, int prevActivationDim)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
     __local float shared_A[2 * groupSize_k0_M][groupSize_k0_K];
     float private_C[2][2];
     __local float shared_B[groupSize_k0_K][2 * groupSize_k0_N];
-    int N = activationDim;
+    //int N = activationDim;
 
     #define min(x,y)    ((x) < (y) ? (x) : (y))
     for (int i = 2 * groupSize_k0_M * gid0; i < batchSize; i += 8192)
@@ -18,7 +18,10 @@ __kernel void weightedSumSigmoid(__global float *preActivations, __global float 
               shared_B[c0][c1] = weights[(j + c1) * weightsDim + (k + c0)];
           for (int c0 = lid0; c0 <= min(2 * groupSize_k0_M - 1, batchSize - i - 1); c0 += groupSize_k0_M)
             for (int c1 = lid1; c1 <= min(groupSize_k0_K - 1, weightsDim - k - 1); c1 += groupSize_k0_N)
-              shared_A[c0][c1] = preActivations[(i + c0) * weightsDim + (k + c1)];
+              if (weightsDim != prevActivationDim && k + c1 == weightsDim - 1)
+                shared_A[c0][c1] = 1.0f;
+              else
+                shared_A[c0][c1] = preActivations[(i + c0) * prevActivationDim + (k + c1)];
           barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
           if (k == 0 && batchSize >= lid0 + i + 1 && numOfPerceptrons >= lid1 + j + 1) {
             private_C[0][0] = 0;
@@ -44,22 +47,14 @@ __kernel void weightedSumSigmoid(__global float *preActivations, __global float 
           barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
         }
           if (numOfPerceptrons >= lid1 + j + 1 && batchSize >= lid0 + i + 1) {
-            activations[(lid0 + i) * N + (lid1 + j)] = 1.0f / (1 + exp(-private_C[0][0]));
-            if (numOfPerceptrons == lid1 + j + 1 && N > numOfPerceptrons)
-              activations[(lid0 + i) * N + (lid1 + j + 1)] = 1.0f;
+            activations[(lid0 + i) * numOfPerceptrons + (lid1 + j)] = 1.0f / (1 + exp(-private_C[0][0]));
             if (numOfPerceptrons >= lid1 + j + groupSize_k0_N + 1) {
-              activations[(lid0 + i) * N + (lid1 + j + groupSize_k0_N)] = 1.0f / (1 + exp(-private_C[0][1]));
-              if (numOfPerceptrons == lid1 + j + groupSize_k0_N + 1 && N > numOfPerceptrons)
-                activations[(lid0 + i) * N + (lid1 + j + groupSize_k0_N + 1)] = 1.0f;
+              activations[(lid0 + i) * numOfPerceptrons + (lid1 + j + groupSize_k0_N)] = 1.0f / (1 + exp(-private_C[0][1]));
             }
             if (batchSize >= lid0 + i + groupSize_k0_M + 1) {
-              activations[(lid0 + i + groupSize_k0_M) * N + (lid1 + j)] = 1.0f / (1 + exp(-private_C[1][0]));
-              if (numOfPerceptrons == lid1 + j + 1 && N > numOfPerceptrons)
-                activations[(lid0 + i + groupSize_k0_M) * N + (lid1 + j + 1)] = 1.0f;
+              activations[(lid0 + i + groupSize_k0_M) * numOfPerceptrons + (lid1 + j)] = 1.0f / (1 + exp(-private_C[1][0]));
               if (numOfPerceptrons >= lid1 + j + groupSize_k0_N + 1){
-                activations[(lid0 + i + groupSize_k0_M) * N + (lid1 + j + groupSize_k0_N)] = 1.0f / (1 + exp(-private_C[1][1]));
-                if (numOfPerceptrons == lid1 + j + groupSize_k0_N + 1 && N > numOfPerceptrons)
-                  activations[(lid0 + i + groupSize_k0_M) * N + (lid1 + j + groupSize_k0_N + 1)] = 1.0f;
+                activations[(lid0 + i + groupSize_k0_M) * numOfPerceptrons + (lid1 + j + groupSize_k0_N)] = 1.0f / (1 + exp(-private_C[1][1]));
               }
             }
           } 
@@ -67,8 +62,8 @@ __kernel void weightedSumSigmoid(__global float *preActivations, __global float 
       }
 }
 
-__kernel void weightedSumBackPropSigmoidCalcErr(__global float *nextError, __global float *nextWeights, __global float *error, 
-                                          int batchSize, int numOfPerceptrons, int nextNumOfNodes, int nextWeightsDim, __global float *activations)
+__kernel void weightedSumBackPropSigmoidCalcErr(__global float *error, __global float *weights, __global float *prevError, 
+                                          int batchSize, int prevActDim, int numOfPerceptrons, int weightsDim, __global float *prevActivations)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
@@ -76,61 +71,60 @@ __kernel void weightedSumBackPropSigmoidCalcErr(__global float *nextError, __glo
     __local float shared_B[groupSize_k1_K][2 * groupSize_k1_N];
     float private_C[2][2];
     __local float shared_Act[2 * groupSize_k1_M][2 * groupSize_k1_N];
-    // int N = nextWeightsDim;
 
     #define min(x,y)    ((x) < (y) ? (x) : (y))
     for (int i = 2 * groupSize_k1_M * gid0; i < batchSize; i += 8192)
-      for (int j = 2 * groupSize_k1_N * gid1; j < numOfPerceptrons; j += 8192) {
-        // if (numOfPerceptrons >= j + 1)
+      for (int j = 2 * groupSize_k1_N * gid1; j < prevActDim; j += 8192) {
+        // if (prevActDim >= j + 1)
         for (int c0 = lid0; c0 <= min(2 * groupSize_k1_M - 1, batchSize - i - 1); c0 += groupSize_k1_M)
-          for (int c1 = lid1; c1 <= min(2 * groupSize_k1_N - 1, numOfPerceptrons - j - 1); c1 += groupSize_k1_N)
-            shared_Act[c0][c1] = activations[(i + c0) * nextWeightsDim + (j + c1)];
-        for (int k = 0; k <= (nextNumOfNodes >= 1 ? nextNumOfNodes - 1 : 0); k += groupSize_k1_K) {
-          for (int c0 = lid0; c0 <= min(groupSize_k1_K - 1, nextNumOfNodes - k - 1); c0 += groupSize_k1_M)
-            for (int c1 = lid1; c1 <= min(2 * groupSize_k1_N - 1, numOfPerceptrons - j - 1); c1 += groupSize_k1_N)
-              shared_B[c0][c1] = nextWeights[(k + c0) * nextWeightsDim + (j + c1)];
+          for (int c1 = lid1; c1 <= min(2 * groupSize_k1_N - 1, prevActDim - j - 1); c1 += groupSize_k1_N)
+            shared_Act[c0][c1] = prevActivations[(i + c0) * prevActDim + (j + c1)];
+        for (int k = 0; k <= (numOfPerceptrons >= 1 ? numOfPerceptrons - 1 : 0); k += groupSize_k1_K) {
+          for (int c0 = lid0; c0 <= min(groupSize_k1_K - 1, numOfPerceptrons - k - 1); c0 += groupSize_k1_M)
+            for (int c1 = lid1; c1 <= min(2 * groupSize_k1_N - 1, prevActDim - j - 1); c1 += groupSize_k1_N)
+              shared_B[c0][c1] = weights[(k + c0) * weightsDim + (j + c1)];
           for (int c0 = lid0; c0 <= min(2 * groupSize_k1_M - 1, batchSize - i - 1); c0 += groupSize_k1_M)
-            for (int c1 = lid1; c1 <= min(groupSize_k1_K - 1, nextNumOfNodes - k - 1); c1 += groupSize_k1_N)
-              shared_A[c0][c1] = nextError[(i + c0) * nextNumOfNodes + (k + c1)];
+            for (int c1 = lid1; c1 <= min(groupSize_k1_K - 1, numOfPerceptrons - k - 1); c1 += groupSize_k1_N)
+              shared_A[c0][c1] = error[(i + c0) * numOfPerceptrons + (k + c1)];
           barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
-          if (k == 0 && batchSize >= lid0 + i + 1 && numOfPerceptrons >= lid1 + j + 1) {
+          if (k == 0 && batchSize >= lid0 + i + 1 && prevActDim >= lid1 + j + 1) {
             private_C[0][0] = 0;
-            if (numOfPerceptrons >= lid1 + j + groupSize_k1_N + 1)
+            if (prevActDim >= lid1 + j + groupSize_k1_N + 1)
               private_C[0][1] = 0;
             if (batchSize >= lid0 + i + groupSize_k1_M + 1) {
               private_C[1][0] = 0;
-              if (numOfPerceptrons >= lid1 + j + groupSize_k1_N + 1)
+              if (prevActDim >= lid1 + j + groupSize_k1_N + 1)
                 private_C[1][1] = 0;
             }
           }
-          if (batchSize >= lid0 + i + 1 && numOfPerceptrons >= lid1 + j + 1)
-            for (int c2 = 0; c2 <= min(groupSize_k1_K - 1, nextNumOfNodes - k - 1); c2 += 1) {
+          if (batchSize >= lid0 + i + 1 && prevActDim >= lid1 + j + 1)
+            for (int c2 = 0; c2 <= min(groupSize_k1_K - 1, numOfPerceptrons - k - 1); c2 += 1) {
               private_C[0][0] += (shared_A[lid0][c2] * shared_B[c2][lid1]) * shared_Act[lid0][lid1] * (1 - shared_Act[lid0][lid1]);
-              if (numOfPerceptrons >= lid1 + j + groupSize_k1_N + 1)
+              if (prevActDim >= lid1 + j + groupSize_k1_N + 1)
                 private_C[0][1] += (shared_A[lid0][c2] * shared_B[c2][lid1 + groupSize_k1_N]) * shared_Act[lid0][lid1 + groupSize_k1_N] * (1 - shared_Act[lid0][lid1 + groupSize_k1_N]);
               if (batchSize >= lid0 + i + groupSize_k1_M + 1) {
                 private_C[1][0] += (shared_A[lid0 + groupSize_k1_M][c2] * shared_B[c2][lid1]) * shared_Act[lid0 + groupSize_k1_M][lid1] * (1 - shared_Act[lid0 + groupSize_k1_M][lid1]);
-                if (numOfPerceptrons >= lid1 + j + groupSize_k1_N + 1)
+                if (prevActDim >= lid1 + j + groupSize_k1_N + 1)
                   private_C[1][1] += (shared_A[lid0 + groupSize_k1_M][c2] * shared_B[c2][lid1 + groupSize_k1_N]) * shared_Act[lid0 + groupSize_k1_M][lid1 + groupSize_k1_N] * (1 - shared_Act[lid0 + groupSize_k1_M][lid1 + groupSize_k1_N]);
               }
             }
           barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
         }
-        if (numOfPerceptrons >= lid1 + j + 1&& batchSize >= lid0 + i + 1) {
-          error[(lid0 + i) * numOfPerceptrons + (lid1 + j)] = private_C[0][0];
-          if (numOfPerceptrons >= lid1 + j + groupSize_k1_N + 1)
-            error[(lid0 + i) * numOfPerceptrons + (lid1 + j + groupSize_k1_N)] = private_C[0][1];
+        if (prevActDim >= lid1 + j + 1&& batchSize >= lid0 + i + 1) {
+          prevError[(lid0 + i) * prevActDim + (lid1 + j)] = private_C[0][0];
+          if (prevActDim >= lid1 + j + groupSize_k1_N + 1)
+            prevError[(lid0 + i) * prevActDim + (lid1 + j + groupSize_k1_N)] = private_C[0][1];
           if (batchSize >= lid0 + i + groupSize_k1_M + 1) {
-            error[(lid0 + i + groupSize_k1_M) * numOfPerceptrons + (lid1 + j)] = private_C[1][0];
-            if (numOfPerceptrons >= lid1 + j + groupSize_k1_N + 1)
-              error[(lid0 + i + groupSize_k1_M) * numOfPerceptrons + (lid1 + j + groupSize_k1_N)] = private_C[1][1];
+            prevError[(lid0 + i + groupSize_k1_M) * prevActDim + (lid1 + j)] = private_C[1][0];
+            if (prevActDim >= lid1 + j + groupSize_k1_N + 1)
+              prevError[(lid0 + i + groupSize_k1_M) * prevActDim + (lid1 + j + groupSize_k1_N)] = private_C[1][1];
           }
         }
         barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
       }
 }
 
-__kernel void weightedSumBackPropSigmoidUpdateGradients(__global float *error, __global float *preActivations, __global float *gradients, int numOfPerceptrons, int weightsDim, int batchSize)
+__kernel void weightedSumBackPropSigmoidUpdateGradients(__global float *error, __global float *preActivations, __global float *gradients, int numOfPerceptrons, int weightsDim, int batchSize, int preActivationsDim)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
@@ -145,7 +139,10 @@ __kernel void weightedSumBackPropSigmoidUpdateGradients(__global float *error, _
         for (int k = 0; k <= (batchSize >= 1 ? batchSize - 1 : 0); k += groupSize_k2_K) {
           for (int c0 = lid0; c0 <= min(groupSize_k2_K - 1, batchSize - k - 1); c0 += groupSize_k2_M)
             for (int c1 = lid1; c1 <= min(2 * groupSize_k2_N - 1, weightsDim - j - 1); c1 += groupSize_k2_N)
-              shared_B[c0][c1] = preActivations[(j + c1) + (k + c0) * weightsDim];
+              if (weightsDim != preActivationsDim && j + c1 == weightsDim - 1)
+                shared_B[c0][c1] = 1.0f;
+              else
+                shared_B[c0][c1] = preActivations[(j + c1) + (k + c0) * preActivationsDim];
           for (int c0 = lid0; c0 <= min(2 * groupSize_k2_M - 1, numOfPerceptrons - i - 1); c0 += groupSize_k2_M)
             for (int c1 = lid1; c1 <= min(groupSize_k2_K - 1, batchSize - k - 1); c1 += groupSize_k2_N)
               shared_A[c0][c1] = error[(i + c0) + (k + c1) * numOfPerceptrons];

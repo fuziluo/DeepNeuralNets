@@ -3,6 +3,8 @@ package com.changjinxiong.deepneuralnets.nn;
 import java.util.Arrays;
 import java.util.Random;
 
+import org.jocl.cl_mem;
+
 import static java.lang.Math.*;
 
 public class ConvolutionalLayer implements FeatureMapLayer {
@@ -28,12 +30,17 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	private final float[] gradients; 
 	private final float[] weightsUpdate; 		
 	private ActivationFunction activationFunction;
+	private final boolean useOpenCL;
+	private cl_mem weightsCL, weightsUpdateCL, gradientsCL;
+	private cl_mem activationsCL;
+	private cl_mem prevErrorsCL;
 
 	public ConvolutionalLayer(int numOfOutputFeatureMaps, int filterHeight, int filterWidth, int stride, 
-			FeatureMapLayer previousLayer, Layer nextLayer, boolean addBias) {
+			FeatureMapLayer previousLayer, Layer nextLayer, boolean addBias, boolean useOpenCL) {
 		this.previousLayer = previousLayer;
 		this.nextLayer = nextLayer;
 		this.numOfOutputFeatureMaps = numOfOutputFeatureMaps;
+		this.useOpenCL = useOpenCL;
 		if (previousLayer != null) {
 			//TODO add support to subsampling layer
 			this.numOfInputFeatureMaps = previousLayer.getNumOfFeatureMaps();
@@ -44,6 +51,8 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			this.weightsUpdate = new float[weights.length];
 			//TODO change the default setting
 			activationFunction = ActivationFunction.SIGMOID;
+			//TODO add OpenCL initailization
+			
 		} else {
 			if (filterHeight != 0 || filterWidth != 0 || stride != 0 ) {
 				throw new IllegalArgumentException("filterHeight, filterWidth and stride must be 0 if the layer is input layer.");
@@ -62,14 +71,6 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		this.stride = stride;
 
 
-	}
-	//TODO use for old handling of bias in fully connected layer, can be improved in future
-	private boolean addBiasNode() {
-		if (getNextLayer() != null && getNextLayer() instanceof FullyConnectedLayer) {
-			return getNextLayer().hasBias();
-		} else {
-			return false;
-		}
 	}
 	
 	private void initializeWeights(float[] weights) {
@@ -151,19 +152,19 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	}
 	
 	@Override
-	public void updateWeights(float learningRate, float momentum) {
+	public void updateWeights(float learningRate, float momentum, float weightDecay) {
 		if (previousLayer == null) { 
 			throw new IllegalArgumentException("Not allowed to update weight on input layer!");
 		}
 		for (int i = 0; i < weights.length; i++) {
-			weightsUpdate[i] = momentum * weightsUpdate[i] - learningRate * gradients[i];
+			weightsUpdate[i] = momentum * weightsUpdate[i] - learningRate * gradients[i]  - learningRate * weightDecay * weights[i] / batchSize;
 			weights[i] += weightsUpdate[i];
 			gradients[i] = 0;
 		}
 	}
 
 	@Override
-	public void backpropagation(boolean useOpenCL) {
+	public void backpropagation() {
 		if (previousLayer == null) { //input layer
 			throw new IllegalStateException("Not backpropagation calculation on input layer!");
 		}
@@ -210,6 +211,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 						for (int m = 0; m < weightsDim - 1; m++) {
 							int rowIndIn = m / filterWidth + row;
 							int colIndIn = m % filterWidth + col;
+//							System.out.printf("! %d %d %d   \n",featureMapOffsetOut,rowIndOut,colIndOut);
 							gradients[j *  weightsDim + m] += errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] * 
 									inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] / batchSize;
 						}
@@ -236,7 +238,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		prevErrors = new float[batchSize * previousLayer.getNumOfNodes()];
 		for (int i = 0; i < batchSize; i++) {
 			int batchOffsetIn = i * numOfInputFeatureMaps * inputFeatureMapSize;
-			int batchOffsetOut = i * (numOfOutputFeatureMaps * outputFeatureMapSize + (addBiasNode()? 1 : 0));
+			int batchOffsetOut = i * numOfOutputFeatureMaps * outputFeatureMapSize;
 			for (int j = 0; j < numOfOutputFeatureMaps; j++) {
 				int featureMapOffsetOut = batchOffsetOut + j * outputFeatureMapSize;
 				for (int row = 0, col = 0; col + filterWidth <= inputFeatureMapsShape[1]; row += stride) {
@@ -253,8 +255,10 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 						for (int m = 0; m < filterHeight * filterWidth; m++) {
 							int rowIndIn = m / filterWidth + row;
 							int colIndIn = m % filterWidth + col;
+							float prevAct = inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn];
+							float der = prevAct * (1 - prevAct); //TODO sigmoid only
 							prevErrors[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] += 
-									weights[j *  weightsDim + m] * errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut];
+									weights[j *  weightsDim + m] * errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] * der;
 						}
 						
 						/****************************************/
@@ -283,7 +287,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			throw new IllegalStateException("set input shape first!");
 		}
 		if (inputs.length % (numOfOutputFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1]) != 0) {
-			throw new IllegalArgumentException("inputs size error!");
+			throw new IllegalArgumentException("inputs size error!" + inputs.length  );
 		}
 		this.batchSize = inputs.length / (numOfOutputFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1]);
 //		outputFeatureMapsShape = activations.length / (numOfOutputFeatureMaps * batchSize) - (addBiasNode() ? 1 : 0);
@@ -291,15 +295,14 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	}
 
 	@Override
-	public void forwardPass(boolean useOpenCL) {
-		// TODO subsampling to be added..
+	public void forwardPass() {
+		// TODO pooling to be added..
 		if (previousLayer == null) { //input layer
-			throw new IllegalStateException("Not forward pass calculation on input layer!");
+			throw new IllegalStateException("No forward pass calculation on input layer!");
 		}
 		batchSize = previousLayer.getBatchSize(); //update batch size
 		updateFeatureMapsShapes();
-		activations = new float[batchSize * (numOfOutputFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1] 
-								+ (addBiasNode() ? 1 : 0))];
+		activations = new float[batchSize * numOfOutputFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1]];
 		if (useOpenCL) {
 			forwardPassOpenCL();
 		} else {
@@ -320,7 +323,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		int weightsDim  = filterHeight * filterWidth + (addBias ? 1 : 0);	
 		for (int i = 0; i < batchSize; i++) {
 			int batchOffsetIn = i * numOfInputFeatureMaps * inputFeatureMapSize;
-			int batchOffsetOut = i * (numOfOutputFeatureMaps * outputFeatureMapSize + (addBiasNode()? 1 : 0));
+			int batchOffsetOut = i * (numOfOutputFeatureMaps * outputFeatureMapSize);
 			for (int j = 0; j < numOfOutputFeatureMaps; j++) {
 				int featureMapOffsetOut = batchOffsetOut + j * outputFeatureMapSize;
 				for (int row = 0, col = 0; col + filterWidth <= inputFeatureMapsShape[1]; row += stride) {
@@ -355,10 +358,6 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 							activationFunction(activations[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut]);
 				}
 			}
-			//TODO for the next fully connected layer. Can be optimized in future
-			if (addBiasNode()) {
-				activations[batchOffsetOut + numOfOutputFeatureMaps * outputFeatureMapSize] = 1;
-			}
 		}
 	}
 
@@ -377,13 +376,13 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		this.nextLayer = nextLayer;
 	}
 
-	@Override
-	public float[] getErrors() {
-		if (previousLayer == null) { //not input layer
-			throw new IllegalStateException("No error on input layer!");
-		}		
-		return errors;
-	}
+//	@Override
+//	public float[] getErrors() {
+//		if (previousLayer == null) { //not input layer
+//			throw new IllegalStateException("No error on input layer!");
+//		}		
+//		return errors;
+//	}
 
 	@Override
 	public float[] getGradients() {
@@ -441,6 +440,24 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			throw new IllegalStateException("No prevErrors on input layer or the second layer!");
 		}
 		return prevErrors;
+	}
+	@Override
+	public cl_mem getWeightCL() {
+		if (previousLayer == null) {
+			throw new IllegalStateException("No weights on input layer!");
+		}	
+		return weightsCL;
+	}
+	@Override
+	public cl_mem getActivationsCL() {
+		return activationsCL;
+	}
+	@Override
+	public cl_mem getPrevErrorsCL() {
+		if (previousLayer == null|| previousLayer.getPreviousLayer() == null) { 
+			throw new IllegalStateException("No prevErrors on input layer or the second layer!");
+		}
+		return prevErrorsCL;
 	}
 
 }

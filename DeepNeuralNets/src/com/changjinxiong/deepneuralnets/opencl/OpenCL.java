@@ -76,7 +76,7 @@ public final class OpenCL {
         cl_platform_id platform = platforms[platformNO];
         clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 255, Pointer.to(buff), param_value_size_ret);
         String vendor = new String(buff, 0, (int)param_value_size_ret[0]);
-        System.out.println("Chosen platform is: " + vendor);
+        LOGGER.log(Level.INFO,"Chosen platform is: {0}", vendor);
         
 		return platform;
 	}
@@ -97,7 +97,7 @@ public final class OpenCL {
         long[] param_value_size_ret = new long[1];
         clGetDeviceInfo(device, CL_DEVICE_NAME, 255, Pointer.to(buff), param_value_size_ret);
         String deviceName = new String(buff, 0, (int)param_value_size_ret[0]);
-        System.out.println("Chosen device is: " + deviceName);	
+        LOGGER.log(Level.INFO, "Chosen device is: {0}", deviceName);	
 
 		return device;
 	}	

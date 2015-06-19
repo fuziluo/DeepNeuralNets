@@ -18,6 +18,8 @@ public interface NeuralNetwork {
 
 	public void train(DataProvider dp, int costType, float learningRate, float momentum, float weightDecay, int lrChangCycle, float lrChangRate,
 			int maxEpoch);
+	public float getCost();
+	
 	public float getCost(float[] labels, int costType);
 
 	public void setError(float[] labels, int costType);

@@ -5,7 +5,7 @@ package com.changjinxiong.deepneuralnets.test;
  *
  */
 public interface DataProvider {
-	public float[] getNextbatchInput(boolean bias);
+	public float[] getNextbatchInput();
 	public float[] getNextBatchLabel();
 	public int getDatasetSize();
 	public int getBatchSize();

@@ -21,21 +21,6 @@ import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
  */
 public class TestMLP {
 
-	@BeforeClass
-	public static void setUpBeforeClass() throws Exception {
-	}
-
-	@AfterClass
-	public static void tearDownAfterClass() throws Exception {
-	}
-
-	@Before
-	public void setUp() throws Exception {
-	}
-
-	@After
-	public void tearDown() throws Exception {
-	}
 	
 	@Test
 	public void testWeightsSize() {
@@ -75,7 +60,7 @@ public class TestMLP {
 		l1 = mlp.getInputLayer();
 		l3.setWeight(new float[] {0.1f, 0.2f, 0.3f});
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f});
-		mlp.fordwardPass(new float[] {1, 2, 1});
+		mlp.fordwardPass(new float[] {1, 2});
 		assertEquals(l2.getActivations()[0], 0.689974, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.880797, 0.00001);
 		assertEquals(l3.getActivations()[0], 0.6330112, 0.00001);
@@ -97,7 +82,7 @@ public class TestMLP {
 		l3.setWeight(new float[] {0.1f, 0.2f, 0.3f});
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f});
 
-		mlp.fordwardPass(new float[] {1, 2, 1});
+		mlp.fordwardPass(new float[] {1, 2});
 		assertEquals(l2.getActivations()[0], 0.689974, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.880797, 0.00001);
 		assertEquals(l3.getActivations()[0], 0.6330112, 0.00001);
@@ -120,15 +105,15 @@ public class TestMLP {
 		
 		//check back propagation 
 		float[] tin = new float[] {	
-				1, 2, 1, 3, 4, 1, 1, 2, 1, 3, 4, 1, 
-				5, 2, 1, 3, 5, 1, 1, 2, 1, 3, 6, 1, 
-				1, 2, 1, 3, 4, 1, 1, 0, 1, 3, 4, 1, 
-				1, 2, 1, 3, 0, 1, 1, 3, 1, 3, 9, 1,
-				7, 9, 1, 7, 4, 1, 1, 2, 1, 3, 4, 1, 
-				1, 2, 1, 3, 2, 1, 1, 2, 1, 3, 5, 1,
-				1, 1, 1, 3, 3, 1, 1, 1, 1, 3, 4, 1,
-				1, 2, 1, 3, 4, 1, 1, 1, 1, 3, 8, 1,
-				1, 2, 1 
+				1, 2, 1, 3, 4, 1, 1, 2,  
+				5, 2, 1, 3, 5, 1, 1, 2,  
+				1, 2, 1, 3, 4, 1, 1, 0,  
+				1, 2, 1, 3, 0, 1, 1, 3,
+				7, 9, 1, 7, 4, 1, 1, 2,  
+				1, 2, 1, 3, 2, 1, 1, 2, 
+				1, 1, 1, 3, 3, 1, 1, 1, 
+				1, 2, 1, 3, 4, 1, 1, 1, 
+				1, 2
 									};
 		float[] tout = new float[] {
 				1, 1, 1, 1, 1, 0, 1, 1, 
@@ -182,6 +167,7 @@ public class TestMLP {
 //		mlp1.updateWeights(0.01f);
 
 //		float[] w2 = l2.getWeight();
+		g12 = l3.getGradients();
 		System.out.println("g12 "+Arrays.toString(g12));
 		System.out.println(l2.getBatchSize());
 //		System.out.println(Arrays.toString(w2));
@@ -207,7 +193,7 @@ public class TestMLP {
 //		float[] tout = {1, 0,
 //						0, 1,
 //						1, 1};
-		float[] tin = mnistTraining.getNextbatchInput(true);
+		float[] tin = mnistTraining.getNextbatchInput();
 		float[] tout = mnistTraining.getNextBatchLabel();
 		mlp.fordwardPass(tin);
 //		float c1 = mlp.getCost(tout);
@@ -231,6 +217,35 @@ public class TestMLP {
 		double g2 = (c2 - c1)/(2 * e);
 		System.out.println(g1+" "+g2);
 		assertEquals(1, g1/g2, 0.001);
+
+	}
+	
+	@Test
+	public void testWeightsSaveLoad() {
+		boolean useOpenCL = true;
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{2,2,1}, false, useOpenCL);
+		Layer l3 = mlp.getOutputLayer();
+		Layer l2 = mlp.getOutputLayer().getPreviousLayer();
+		l3.setWeight(new float[] {0.1f, 0.2f});
+		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f});
+		
+		assertArrayEquals("Initial check wrong l2", new float[] {0.1f, 0.2f, 0.3f, 0.4f}, l2.getWeight(), 0.00001f);
+		assertArrayEquals("Initial check wrong l3", new float[] {0.1f, 0.2f}, l3.getWeight(), 0.00001f);
+
+		
+		String path = "/home/jxchang/project/DeepLearningInJava/DeepNeuralNets/DeepNeuralNets/test/.MultiLayerPerceptron.weights";
+		mlp.saveWeights(path);
+	
+		l3.setWeight(new float[] {1.1f, 1.2f});
+		l2.setWeight(new float[] {1.1f, 1.2f, 1.3f, 1.4f});
+		
+		assertArrayEquals("Second check wrong l2", new float[] {1.1f, 1.2f, 1.3f, 1.4f}, l2.getWeight(), 0.00001f);
+		assertArrayEquals("Second check wrong l3", new float[] {1.1f, 1.2f}, l3.getWeight(), 0.00001f);
+		
+		mlp.loadWeights(path);
+		
+		assertArrayEquals("Final check wrong l2", new float[] {0.1f, 0.2f, 0.3f, 0.4f}, l2.getWeight(), 0.00001f);
+		assertArrayEquals("Final check wrong l3", new float[] {0.1f, 0.2f}, l3.getWeight(), 0.00001f);
 
 	}
 

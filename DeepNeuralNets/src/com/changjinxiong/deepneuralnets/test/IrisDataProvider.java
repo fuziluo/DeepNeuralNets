@@ -188,16 +188,16 @@ public class IrisDataProvider implements DataProvider{
 		}
 	}
 
-	public float[] getNextbatchInput(boolean bias) {
+	public float[] getNextbatchInput() {
 		int dataSize = irisData[0].length;
-		int dataSizeWithBias = dataSize + (bias ? 1 : 0);
+		int dataSizeWithBias = dataSize;
 		float[] result = new float[dataSizeWithBias * batchSize];
 		labels = new float[3 * batchSize]; //3 kinds of iris
 		for (int i = 0; i < batchSize; i++) {
 			System.arraycopy(irisData[indexSeq.get(currentIndex)], 0, result, i * dataSizeWithBias, dataSize);
-			if (bias) { //bias activation is always 1
-				result[i * dataSizeWithBias + dataSize] = 1;
-			}
+//			if (bias) { //bias activation is always 1
+//				result[i * dataSizeWithBias + dataSize] = 1;
+//			}
 			if (indexSeq.get(currentIndex) < 50) {
 				labels[i * 3] = 1;
 			} else if (indexSeq.get(currentIndex) < 100) {

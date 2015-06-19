@@ -10,6 +10,8 @@ import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
@@ -18,6 +20,7 @@ import javax.swing.JLabel;
 
 import org.junit.Test;
 
+import com.changjinxiong.deepneuralnets.nn.ConvolutionalNeuralNetwork;
 import com.changjinxiong.deepneuralnets.nn.MultiLayerPerceptron;
 import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
 import com.changjinxiong.deepneuralnets.test.CIFAR10DataProvider.DatasetType;
@@ -55,7 +58,7 @@ public class TestCIFAR {
 				"truck"};
 		
 		for (int i = 0; i < cp.getDatasetSize(); i ++) {
-			float[] floatPixels = cp.getNextbatchInput(false);
+			float[] floatPixels = cp.getNextbatchInput();
 			int[] pixels = new int[floatPixels.length] ;
 			for (int j = 0; j < pixels.length/3; j++) {
 				pixels[j * 3] = (int) (floatPixels[j] * 255);
@@ -95,20 +98,48 @@ public class TestCIFAR {
 	}
 
 	@Test
-	public void Test() {
+	public void TestCIFAR10MLP() {
 		boolean useOpenCL = true;
 		boolean addBias = true;
-		int batchSize = 128;
-		int costType = 0; //cross entropy
+		int batchSize = 64;
 		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
 		CIFAR10DataProvider TestSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", 10000, DatasetType.TEST, false);
+		int costType = 0; //cross entropy
+		float baselearningRate = 0.02f;
+		float momentum = 0.9f;
+		float weightDecay = 0.05f;
+		int lrChangeCycle = 0;//10 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
+		float lrChangeRate = 0.33f;
+		int epoch = 20;
+		int[] mlpLayers = new int[]{3072, 1024, 512 ,10};
+		NeuralNetwork mlp = new MultiLayerPerceptron(mlpLayers, addBias, useOpenCL); 
 		
-		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{3072, 1024, 512 ,10}, addBias, useOpenCL); 
+		Logger logger = Logger.getLogger("CIFAR10 traing with MLP");
+		logger.log(Level.INFO, "MLP architecture: \n"
+				+ "{0} {1} bias \n", new Object[] {Arrays.toString(mlpLayers), addBias ? "with" : "without"});
+
+		logger.log(Level.INFO, "Traning configuration: \n"
+				+ "useOpenCL = {0} \n"
+				+ "batchSize = {1} \n"
+				+ "costType = {2} \n"
+				+ "epoch = {3} \n"
+				+ "baselearningRate = {4} \n"
+				+ "momentum = {5} \n"
+				+ "weightDecay = {6} \n"
+				+ "lrChangeCycle = {7} \n"
+				+ "lrChangeRate = {8} \n", new Object[] {useOpenCL, batchSize, (costType==0?"CE":"MSE"), epoch, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate});
+		
 //		mlp.test(trainingSet);
 		mlp.test(TestSet);
-		System.out.println("Training start...");
-		int decayCycle = 20 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
-		mlp.train(trainingSet, costType, 0.03f, 0.9f, 0, decayCycle, 0.33f, 80);
+		
+		logger.log(Level.INFO, "Training start...");
+		mlp.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
+
+		logger.log(Level.INFO, "Saving weights...");
+		String path = "/home/jxchang/project/records/cifar/.mlp.weights";
+		mlp.saveWeights(path);
+		logger.log(Level.INFO, "Weights saved to " + path);
+
 		mlp.test(trainingSet);
 //		System.out.println("Test with test set...");
 		float errorRate = mlp.test(TestSet);
@@ -116,4 +147,55 @@ public class TestCIFAR {
 	}
 	
 
+	@Test
+	public void TestCIFAR10CNN() {
+		boolean useOpenCL = false;
+		boolean addBias = true;
+		int batchSize = 64;
+		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
+		CIFAR10DataProvider TestSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", 10000, DatasetType.TEST, false);
+		int costType = 0; //cross entropy
+		float baselearningRate = 0.02f;
+		float momentum = 0.9f;
+		float weightDecay = 0.05f;
+		int lrChangeCycle = 0;//10 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
+		float lrChangeRate = 0.33f;
+		int epoch = 20;
+		//TODO add pooling
+		int[][] cnnLayers = new int[][] {{3, 0, 0 ,0}, {32, 5, 5, 1},/* {32, 5, 5, 1},*/ {64, 5, 5, 1}, {10}};
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, useOpenCL); 
+		cnn.setInputShape(new int[] {32, 32});
+		
+		Logger logger = Logger.getLogger("CIFAR10 traing with MLP");
+		logger.log(Level.INFO, "MLP architecture: \n"
+				+ "{0} {1} bias \n", new Object[] {Arrays.toString(cnnLayers), addBias ? "with" : "without"});
+
+		logger.log(Level.INFO, "Traning configuration: \n"
+				+ "useOpenCL = {0} \n"
+				+ "batchSize = {1} \n"
+				+ "costType = {2} \n"
+				+ "epoch = {3} \n"
+				+ "baselearningRate = {4} \n"
+				+ "momentum = {5} \n"
+				+ "weightDecay = {6} \n"
+				+ "lrChangeCycle = {7} \n"
+				+ "lrChangeRate = {8} \n", new Object[] {useOpenCL, batchSize, (costType==0?"CE":"MSE"), epoch, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate});
+		
+//		mlp.test(trainingSet);
+//		logger.log(Level.INFO, "Pretest before training...");
+//		cnn.test(TestSet);
+		
+		logger.log(Level.INFO, "Training start...");
+		cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
+
+		logger.log(Level.INFO, "Saving weights...");
+		String path = "/home/jxchang/project/records/cifar/.mlp.weights";
+		cnn.saveWeights(path);
+
+		cnn.test(trainingSet);
+//		System.out.println("Test with test set...");
+		float errorRate = cnn.test(TestSet);
+		assertEquals(0, errorRate, 0.1);		
+	}
+	
 }

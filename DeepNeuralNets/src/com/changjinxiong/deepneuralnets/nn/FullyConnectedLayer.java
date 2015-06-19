@@ -81,7 +81,7 @@ public class FullyConnectedLayer implements Layer{
 	}
 	@Override
 	protected void finalize() {
-		System.out.println("***releasing all cl resources***");
+		LOGGER.log(Level.FINEST, "***releasing all cl resources***");
 		if (useOpenCL) {
 			if (weightsCL != null) {
 				clReleaseMemObject(weightsCL);
@@ -115,14 +115,6 @@ public class FullyConnectedLayer implements Layer{
 
 		}
 	}
-	
-	private boolean addBiasNode() {
-		if (getNextLayer() != null) {
-			return getNextLayer().hasBias();
-		} else {
-			return false;
-		}
-	}
 
 	private void generateKernels() {
 		if (kernel0 != null) {
@@ -138,7 +130,6 @@ public class FullyConnectedLayer implements Layer{
 			clReleaseKernel(kernel3);
 		}		
 	
-		LOGGER.log(Level.INFO, "Creating kernels...");
 		//dimension of input for kernel calculation, used for getting the optimal group size
 		int[] dimensions = {batchSize, numOfPerceptron, weights.length/numOfPerceptron,
 							batchSize, previousLayer.getNumOfNodes(), numOfPerceptron,
@@ -153,6 +144,7 @@ public class FullyConnectedLayer implements Layer{
 		kernel2 = clCreateKernel(program, "weightedSumBackPropSigmoidUpdateGradients", null); 
 		//for updateWeights
 		kernel3 = clCreateKernel(program, "updateWeights", null); 
+		LOGGER.log(Level.FINE, "Kernels created for {0}", this.getClass().getSimpleName());
 		clReleaseProgram(program);
 		int[] groupSize = OpenCL.getGroupSize(dimensions);
 		localWorkSizeK0 = new long[] {groupSize[0], groupSize[1]};
@@ -274,7 +266,7 @@ public class FullyConnectedLayer implements Layer{
 			weightsUpdate = new float[weights.length];
 		}
 
-		activations = new float[batchSize * (numOfPerceptron + (addBiasNode() ? 1 : 0))];
+		activations = new float[batchSize * numOfPerceptron ];
 
 		if (useOpenCL) {
 //			System.out.println("----Timing for forwardPass---");
@@ -293,10 +285,10 @@ public class FullyConnectedLayer implements Layer{
 			throw new IllegalStateException("Only allow to set activations on input layer!");
 		}
 	
-		if (inputs.length % (numOfPerceptron + (addBiasNode() ? 1 : 0)) != 0) {
+		if (inputs.length % numOfPerceptron != 0) {
 			throw new IllegalArgumentException("inputs size error!");
 		}
-		int newBatchSize = inputs.length / (numOfPerceptron + (addBiasNode() ? 1 : 0));
+		int newBatchSize = inputs.length / numOfPerceptron;
 		this.batchSize = newBatchSize;
 		this.activations = inputs;
 		if (useOpenCL) {
@@ -349,8 +341,8 @@ public class FullyConnectedLayer implements Layer{
 		int[] arg3 = new int[] {batchSize};
 		int[] arg4 = new int[] {numOfPerceptron};
 		int[] arg5 = new int[] {weights.length/numOfPerceptron};
-		int activationDim = addBiasNode()? (numOfPerceptron + 1) : numOfPerceptron;
-		int[] arg6 = new int[] {activationDim};
+		int prevActivationDim = previousLayer.getNumOfNodes();
+		int[] arg6 = new int[] {prevActivationDim};
 		//set arguments
         clSetKernelArg(kernel0, 0, Sizeof.cl_mem, Pointer.to(arg0));
         clSetKernelArg(kernel0, 1, Sizeof.cl_mem, Pointer.to(arg1));
@@ -377,18 +369,22 @@ public class FullyConnectedLayer implements Layer{
 	}
 	private void forwardPassNoAcc() {
 		float[] previousActivations = previousLayer.getActivations();
-		int activationDim = addBiasNode()? (numOfPerceptron + 1) : numOfPerceptron;
+//		int activationDim = addBiasNode()? (numOfPerceptron + 1) : numOfPerceptron;
+		int prevActivationDim = previousLayer.getNumOfNodes();
 		int weightsDim = weights.length/numOfPerceptron;
 		for (int i = 0; i < batchSize; i++) {
 			for (int j = 0; j < numOfPerceptron; j++) {
 				for (int k = 0; k < weightsDim; k++) {
-					activations[i*activationDim + j] += weights[j*weightsDim + k]*previousActivations[i*weightsDim + k];
+					if (addBias && k == weightsDim - 1)
+						activations[i*numOfPerceptron + j] += weights[j*weightsDim + k];
+					else
+						activations[i*numOfPerceptron + j] += weights[j*weightsDim + k] * previousActivations[i*prevActivationDim + k];
 				}
-				activations[i*activationDim + j] = (float) (1.0/(1 + exp(-activations[i*activationDim + j])));
+				activations[i*numOfPerceptron + j] = (float) (1.0/(1 + exp(-activations[i*numOfPerceptron + j])));
 			}
-			if (addBiasNode()) {
-				activations[i*activationDim + numOfPerceptron] = 1; //bias node
-			}
+//			if (addBiasNode()) {
+//				activations[i*activationDim + numOfPerceptron] = 1; //bias node
+//			}
 		}
 	}
 	@Override
@@ -446,12 +442,14 @@ public class FullyConnectedLayer implements Layer{
 		int weightsDim = weights.length/numOfPerceptron;
 		int[] arg14 = new int[] {weightsDim};
 		int[] arg15 = new int[] {batchSize};
+		int[] arg16 = new int[] {previousLayer.getNumOfNodes()};
 		clSetKernelArg(kernel2, 0, Sizeof.cl_mem, Pointer.to(arg10));
 		clSetKernelArg(kernel2, 1, Sizeof.cl_mem, Pointer.to(arg11));
 		clSetKernelArg(kernel2, 2, Sizeof.cl_mem, Pointer.to(arg12));
 		clSetKernelArg(kernel2, 3, Sizeof.cl_int, Pointer.to(arg13));
 		clSetKernelArg(kernel2, 4, Sizeof.cl_int, Pointer.to(arg14));
 		clSetKernelArg(kernel2, 5, Sizeof.cl_int, Pointer.to(arg15));
+		clSetKernelArg(kernel2, 6, Sizeof.cl_int, Pointer.to(arg16));
     	long[] globalWorkSize = {(long) ceil((min(numOfPerceptron, 8192))/(2.0 * localWorkSizeK2[0])) * localWorkSizeK2[0], (long) ceil((min(weightsDim, 8192))/(2.0 * localWorkSizeK2[1])) * localWorkSizeK2[1]};
 
 		clEnqueueNDRangeKernel(commandQueue, kernel2, 2, null, globalWorkSize, localWorkSizeK2, 0, null, null);
@@ -529,13 +527,16 @@ public class FullyConnectedLayer implements Layer{
 		} else {
 			errors = nextLayer.getPrevErrors();
 		}
-		int weightDim = weights.length / numOfPerceptron;
+		int weightsDim = weights.length / numOfPerceptron;
+		int prevActivationDim = previousLayer.getNumOfNodes();
 		for (int i = 0; i < numOfPerceptron; i++) {
-			for (int j = 0; j < weightDim; j++) {
-				for (int k = 0; k < batchSize; k++) {
-					gradients[i * weightDim + j] += errors[k * numOfPerceptron + i] * previousLayer.getActivations()[k * weightDim + j];
+			for (int k = 0; k < batchSize; k++) {
+				for (int j = 0; j < weightsDim; j++) {
+					if (addBias && j == weightsDim - 1)
+						gradients[i * weightsDim + j] += errors[k * numOfPerceptron + i] / batchSize;
+					else
+						gradients[i * weightsDim + j] += errors[k * numOfPerceptron + i] * previousLayer.getActivations()[k * prevActivationDim + j] / batchSize;
 				}
-				gradients[i * weightDim + j] /= batchSize;
 			}
 		}	
 		if (previousLayer.getPreviousLayer() != null) {
@@ -546,10 +547,11 @@ public class FullyConnectedLayer implements Layer{
 
 	private void calculatPrevErr() {
 		prevErrors = new float[batchSize * previousLayer.getNumOfNodes()];
-		int weightsDim = addBias? (previousLayer.getNumOfNodes() + 1) : previousLayer.getNumOfNodes();
+		int weightsDim = weights.length / numOfPerceptron;
+		int prevActivationDim  = previousLayer.getNumOfNodes();
 		for (int i = 0; i < batchSize; i++) {
-			for (int j = 0; j < previousLayer.getNumOfNodes(); j++) {
-				float activation = previousLayer.getActivations()[i * weightsDim + j];
+			for (int j = 0; j < prevActivationDim; j++) {
+				float activation = previousLayer.getActivations()[i * prevActivationDim + j];
 				float derivative = activation * (1 - activation);
 				for (int k = 0; k < numOfPerceptron; k++) {
 					prevErrors[i * previousLayer.getNumOfNodes() + j] += weights[k * weightsDim + j] * errors[i * numOfPerceptron + k];
@@ -564,7 +566,7 @@ public class FullyConnectedLayer implements Layer{
 		if (previousLayer == null) { 
 			throw new IllegalStateException("Not allowed to update weight on input layer!");
 		}
-//		LOGGER.log(Level.FINE, "update weight..");
+		LOGGER.log(Level.FINE, "update weight..");
 		if (useOpenCL) {
 	        setExceptionsEnabled(true);
 			cl_command_queue commandQueue = OpenCL.getCommandQueue();

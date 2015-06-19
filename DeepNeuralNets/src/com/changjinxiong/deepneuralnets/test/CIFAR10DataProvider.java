@@ -70,9 +70,9 @@ public class CIFAR10DataProvider implements DataProvider {
 	}
 
 	@Override
-	public float[] getNextbatchInput(boolean bias) {
+	public float[] getNextbatchInput() {
 		int dataSize = 3 * 32 * 32;
-		int dataSizeWithBias = dataSize + (bias ? 1 : 0);
+		int dataSizeWithBias = dataSize;
 		float[] result = new float[dataSizeWithBias * batchSize];
 	    byte[] currentImage = new byte[dataSize];
 	    float[] currentLabel = new float[10 * batchSize];
@@ -93,9 +93,9 @@ public class CIFAR10DataProvider implements DataProvider {
 					e.printStackTrace();
 			}
 
-			if (bias) { //bias node is always 1
-				result[i * dataSizeWithBias + dataSize] = 1;
-			}
+//			if (bias) { //bias node is always 1
+//				result[i * dataSizeWithBias + dataSize] = 1;
+//			}
 			currentIndex ++;
 			if (currentIndex >= datasetSize) {
 				if (random) {
