@@ -16,18 +16,14 @@ public interface Layer {
 	public Layer getPreviousLayer();
 	public Layer getNextLayer();
 	public void setNextLayer(Layer nextLayer);
-//	public float[] getErrors();
 	public float[] getWeight();
 	public float[] getActivations();
 	public float[] getPrevErrors();
 	public float[] getGradients();
 	public void setErrors(float[] error);
 	public int getBatchSize();
-	public boolean hasBias();
 	public int getNumOfNodes();
-	public cl_mem getWeightCL();
+//	public cl_mem getWeightCL();
 	public cl_mem getActivationsCL();
 	public cl_mem getPrevErrorsCL();
-//	public cl_mem getGradientsCL();
-//	public void cleanOpenCLKernels();
 }

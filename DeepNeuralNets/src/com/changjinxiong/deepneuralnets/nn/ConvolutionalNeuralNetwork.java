@@ -16,19 +16,20 @@ public class ConvolutionalNeuralNetwork extends NeuralNetworkBase {
 		outputLayer = inputLayer;		
 		Layer newLayer;
 		for (int i = 1; i < numOfLayers; i++ ) {
-			if (layerParameters[i].length == 4) {
+			if (layerParameters[i].length == 4) { //convolutional layer
 				if (!(outputLayer instanceof FeatureMapLayer)) {
 					throw new IllegalArgumentException("Convolutional layer must be connected to a FeatureMap layer");
 				}
 				newLayer = new ConvolutionalLayer(layerParameters[i][0], layerParameters[i][1],layerParameters[i][2],layerParameters[i][3],
 						(FeatureMapLayer) outputLayer, null, addBias, useOpenCL);
-				
-			} else if (layerParameters[i].length == 1) {
+			} else if (layerParameters[i].length == 1) { //fully connected layer
 				newLayer = new FullyConnectedLayer(layerParameters[i][0], outputLayer, null, addBias, useOpenCL);
-
-			} else if (layerParameters[i].length == 2) {
-				//TODO add support for subsampling
-				throw new UnsupportedOperationException("Subsampling layer not implemented yet");
+			} else if (layerParameters[i].length == 2) { //pooling layer
+				if (!(outputLayer instanceof FeatureMapLayer)) {
+					throw new IllegalArgumentException("Pooling layer must be connected to a FeatureMap layer");
+				}
+				newLayer = new PoolingLayer(layerParameters[i][0], layerParameters[i][1],
+						(FeatureMapLayer) outputLayer, null, useOpenCL);
 			} else { 
 				throw new IllegalArgumentException("The parameter of layer "+ i +" is wrong");
 			}

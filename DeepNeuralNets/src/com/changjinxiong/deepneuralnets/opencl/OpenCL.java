@@ -142,9 +142,9 @@ public final class OpenCL {
 	 */
 	public static final cl_program getProgram(LayerType layerType, ActivationFunction actType , int[] para) {
     	//TODO add other activation functions
-		if (layerType == LayerType.POOL) {
-			throw new IllegalArgumentException("Layer type not supported yet");
-		}
+//		if (layerType == LayerType.POOL) {
+//			throw new IllegalArgumentException("Layer type not supported yet");
+//		}
 		if (layerType == LayerType.FULLY && actType != ActivationFunction.SIGMOID) {
 			throw new IllegalArgumentException("Activation fuction not supported yet for this layer type");
 		}
@@ -162,6 +162,8 @@ public final class OpenCL {
         } else if (layerType == LayerType.CONV) {
         	//TODO add other activation functions
         	kernelSource = "convolutional.cl";
+        } else if (layerType == LayerType.POOL) {
+        	kernelSource = "pooling.cl";
         }
         try {
 			//TODO
@@ -189,6 +191,21 @@ public final class OpenCL {
 				fileContent = "#define stride " + para[9] + "\n" + fileContent;
 				fileContent = "#define addBias " + para[10] + "\n" + fileContent;
 //				System.out.println(fileContent);
+			}
+			if (layerType == LayerType.POOL) {
+				fileContent = "#define poolingType " + para[0] + "\n" + fileContent;
+				fileContent = "#define AVER " + para[1] + "\n" + fileContent;
+				fileContent = "#define MAX " + para[2] + "\n" + fileContent;
+				fileContent = "#define numOfFeatureMaps " + para[3] + "\n" + fileContent;
+				fileContent = "#define inputFeatureMapsShapeH " + para[4] + "\n" + fileContent;
+				fileContent = "#define inputFeatureMapsShapeW " + para[5] + "\n" + fileContent;
+				fileContent = "#define outputFeatureMapsShapeH " + para[6] + "\n" + fileContent;
+				fileContent = "#define outputFeatureMapsShapeW " + para[7] + "\n" + fileContent;
+				fileContent = "#define poolHeight " + para[8] + "\n" + fileContent;
+				fileContent = "#define poolWidth " + para[9] + "\n" + fileContent;
+				fileContent = "#define batchSize " + para[10] + "\n" + fileContent;
+				
+
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

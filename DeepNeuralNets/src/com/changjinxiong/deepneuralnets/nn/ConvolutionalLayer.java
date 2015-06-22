@@ -20,7 +20,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	private final boolean addBias;
 	private final FeatureMapLayer previousLayer;
 	private Layer nextLayer;
-	private int batchSize = 1; //batch size could change in different calculation
+	private int batchSize; //batch size could change in different calculation
 
 	private final int numOfInputFeatureMaps;
 	private final int numOfOutputFeatureMaps;
@@ -202,8 +202,8 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		return numOfOutputFeatureMaps;
 	}
 	
-	@Override
-	public void updateFeatureMapsShapes() {
+//	@Override
+	private void updateFeatureMapsShapes() {
 		if (previousLayer == null) { 
 			throw new IllegalStateException("Input layer shouldn't call updateFeatureMapsShapes()!");
 		}
@@ -306,8 +306,6 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		}
 		if (nextLayer == null) { //output layer
 			throw new IllegalStateException("Convolutional layer shoudn't be an output layer!");
-		} else {
-			errors = nextLayer.getPrevErrors();
 		}
 		if (useOpenCL) {
 			backPropOpenCL();
@@ -320,6 +318,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		/**************************************
 		 * calculating gradients
 		 **************************************/
+		errors = nextLayer.getPrevErrors();
 		float[] inputFeatureMaps = previousLayer.getActivations();
 		int inputFeatureMapSize = inputFeatureMapsShape[0] * inputFeatureMapsShape[1];
 		int outputFeatureMapSize = outputFeatureMapsShape[0] * outputFeatureMapsShape[1];
@@ -481,7 +480,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		clEnqueueNDRangeKernel(commandQueue, kernel2, 2, null, globalWorkSize, localWorkSizeK2, 0, null, null);
 		clFinish(commandQueue);
 //		clEnqueueReadBuffer(commandQueue, arg23, CL_TRUE, 0, prevErrors.length * Sizeof.cl_float, Pointer.to(prevErrors), 0, null, null);
-		clReleaseMemObject(arg1);
+//		clReleaseMemObject(arg1);//FIXME
 
 	}
 	@Override
@@ -533,7 +532,6 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 
 	private void forwardPassOpenCL() {
         setExceptionsEnabled(true);
-//        generateKernels();
         cl_context context = OpenCL.getContext();
 		cl_command_queue commandQueue = OpenCL.getCommandQueue();
 		cl_mem arg0 = previousLayer.getActivationsCL();
@@ -553,8 +551,6 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		clEnqueueNDRangeKernel(commandQueue, kernel0, 2, null, globalWorkSize, localWorkSizeK0, 0, null, null);
         clFinish(commandQueue);
 //        clEnqueueReadBuffer(commandQueue, arg2, CL_TRUE, 0, activations.length * Sizeof.cl_float, Pointer.to(activations), 0, null, null);
-//        clReleaseMemObject(arg0);
-//        clReleaseMemObject(arg1);
 	}
 
 	private void forwardPassNoAcc() {
@@ -666,11 +662,6 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	}
 
 	@Override
-	public boolean hasBias() {
-		return addBias;
-	}
-
-	@Override
 	public int getNumOfNodes() {
 		if (outputFeatureMapsShape == null) {
 			updateFeatureMapsShapes();
@@ -690,13 +681,13 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		}
 		return prevErrors;
 	}
-	@Override
-	public cl_mem getWeightCL() {
-		if (previousLayer == null) {
-			throw new IllegalStateException("No weights on input layer!");
-		}	
-		return weightsCL;
-	}
+//	@Override
+//	public cl_mem getWeightCL() {
+//		if (previousLayer == null) {
+//			throw new IllegalStateException("No weights on input layer!");
+//		}	
+//		return weightsCL;
+//	}
 	@Override
 	public cl_mem getActivationsCL() {
 		return activationsCL;

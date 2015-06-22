@@ -35,10 +35,10 @@ public class FullyConnectedLayer implements Layer{
 	private float[] weightsUpdate; 	
 	private final Layer previousLayer;
 	private Layer nextLayer;
-	private int batchSize = 128; //batch size could change in different calculation
+	private int batchSize; //batch size could change in different calculation
 	private final boolean useOpenCL;
 	
-	private cl_kernel kernel0, kernel1, kernel2, kernel3;
+	private cl_kernel kernel0, kernel2, kernel1, kernel3;
 	private long[] localWorkSizeK0, localWorkSizeK1, localWorkSizeK2, localWorkSizeK3;
 	
 	public FullyConnectedLayer(int numOfPerceptron, Layer previousLayer, Layer nextLayer, boolean addBias, boolean useOpenCL) {
@@ -109,8 +109,8 @@ public class FullyConnectedLayer implements Layer{
 				prevErrorsCL = null;
 			}
 	        clReleaseKernel(kernel0);
-	        clReleaseKernel(kernel1);
 	        clReleaseKernel(kernel2);
+	        clReleaseKernel(kernel1);
 	        clReleaseKernel(kernel3);
 
 		}
@@ -120,11 +120,11 @@ public class FullyConnectedLayer implements Layer{
 		if (kernel0 != null) {
 			clReleaseKernel(kernel0);
 		}
-		if (kernel1 != null) {
-			clReleaseKernel(kernel1);
-		}
 		if (kernel2 != null) {
 			clReleaseKernel(kernel2);
+		}
+		if (kernel1 != null) {
+			clReleaseKernel(kernel1);
 		}		
 		if (kernel3 != null) {
 			clReleaseKernel(kernel3);
@@ -137,11 +137,11 @@ public class FullyConnectedLayer implements Layer{
 							};
 		cl_program program = OpenCL.getProgram(OpenCL.LayerType.FULLY, OpenCL.ActivationFunction.SIGMOID, dimensions);
 		//kernel for forward pass
-	    kernel0 = clCreateKernel(program, "weightedSumSigmoid", null); 
-		//create kernel for calculating err in backprop
-		kernel1 = clCreateKernel(program, "weightedSumBackPropSigmoidCalcErr", null); 
+	    kernel0 = clCreateKernel(program, "forwardPass", null); 
 		//for gradients
-		kernel2 = clCreateKernel(program, "weightedSumBackPropSigmoidUpdateGradients", null); 
+		kernel1 = clCreateKernel(program, "backCalcGradients", null); 
+		//for calculating err 
+		kernel2 = clCreateKernel(program, "backCalcPrevErr", null); 
 		//for updateWeights
 		kernel3 = clCreateKernel(program, "updateWeights", null); 
 		LOGGER.log(Level.FINE, "Kernels created for {0}", this.getClass().getSimpleName());
@@ -212,10 +212,6 @@ public class FullyConnectedLayer implements Layer{
 	        clEnqueueReadBuffer(commandQueue, activationsCL, CL_TRUE, 0, activations.length * Sizeof.cl_float, Pointer.to(activations), 0, null, null);
 		}
 		return activations;
-	}
-	@Override
-	public boolean hasBias() {
-		return addBias;
 	}
 		
 	@Override
@@ -454,16 +450,16 @@ public class FullyConnectedLayer implements Layer{
 		int[] arg14 = new int[] {weightsDim};
 		int[] arg15 = new int[] {batchSize};
 		int[] arg16 = new int[] {previousLayer.getNumOfNodes()};
-		clSetKernelArg(kernel2, 0, Sizeof.cl_mem, Pointer.to(arg10));
-		clSetKernelArg(kernel2, 1, Sizeof.cl_mem, Pointer.to(arg11));
-		clSetKernelArg(kernel2, 2, Sizeof.cl_mem, Pointer.to(arg12));
-		clSetKernelArg(kernel2, 3, Sizeof.cl_int, Pointer.to(arg13));
-		clSetKernelArg(kernel2, 4, Sizeof.cl_int, Pointer.to(arg14));
-		clSetKernelArg(kernel2, 5, Sizeof.cl_int, Pointer.to(arg15));
-		clSetKernelArg(kernel2, 6, Sizeof.cl_int, Pointer.to(arg16));
+		clSetKernelArg(kernel1, 0, Sizeof.cl_mem, Pointer.to(arg10));
+		clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg11));
+		clSetKernelArg(kernel1, 2, Sizeof.cl_mem, Pointer.to(arg12));
+		clSetKernelArg(kernel1, 3, Sizeof.cl_int, Pointer.to(arg13));
+		clSetKernelArg(kernel1, 4, Sizeof.cl_int, Pointer.to(arg14));
+		clSetKernelArg(kernel1, 5, Sizeof.cl_int, Pointer.to(arg15));
+		clSetKernelArg(kernel1, 6, Sizeof.cl_int, Pointer.to(arg16));
     	long[] globalWorkSize = {(long) ceil((min(numOfPerceptron, 8192))/(2.0 * localWorkSizeK2[0])) * localWorkSizeK2[0], (long) ceil((min(weightsDim, 8192))/(2.0 * localWorkSizeK2[1])) * localWorkSizeK2[1]};
 
-		clEnqueueNDRangeKernel(commandQueue, kernel2, 2, null, globalWorkSize, localWorkSizeK2, 0, null, null);
+		clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK2, 0, null, null);
 //		long t3 = System.currentTimeMillis();
 		clFinish(commandQueue);
 //		long t4 = System.currentTimeMillis();
@@ -507,17 +503,17 @@ public class FullyConnectedLayer implements Layer{
 			cl_mem arg7 = previousLayer.getActivationsCL();
 //			cl_mem arg7 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, previousLayer.getActivations().length* Sizeof.cl_float, Pointer.to(previousLayer.getActivations()), null);
 			//set arguments
-			clSetKernelArg(kernel1, 0, Sizeof.cl_mem, Pointer.to(arg0));
-			clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg1));
-			clSetKernelArg(kernel1, 2, Sizeof.cl_mem, Pointer.to(arg2));
-			clSetKernelArg(kernel1, 3, Sizeof.cl_int, Pointer.to(arg3));
-			clSetKernelArg(kernel1, 4, Sizeof.cl_int, Pointer.to(arg4));
-			clSetKernelArg(kernel1, 5, Sizeof.cl_int, Pointer.to(arg5));
-			clSetKernelArg(kernel1, 6, Sizeof.cl_int, Pointer.to(arg6));
-			clSetKernelArg(kernel1, 7, Sizeof.cl_mem, Pointer.to(arg7));
+			clSetKernelArg(kernel2, 0, Sizeof.cl_mem, Pointer.to(arg0));
+			clSetKernelArg(kernel2, 1, Sizeof.cl_mem, Pointer.to(arg1));
+			clSetKernelArg(kernel2, 2, Sizeof.cl_mem, Pointer.to(arg2));
+			clSetKernelArg(kernel2, 3, Sizeof.cl_int, Pointer.to(arg3));
+			clSetKernelArg(kernel2, 4, Sizeof.cl_int, Pointer.to(arg4));
+			clSetKernelArg(kernel2, 5, Sizeof.cl_int, Pointer.to(arg5));
+			clSetKernelArg(kernel2, 6, Sizeof.cl_int, Pointer.to(arg6));
+			clSetKernelArg(kernel2, 7, Sizeof.cl_mem, Pointer.to(arg7));
 			//enqueues a command to execute a kernel on a device
 	    	globalWorkSize = new long[] {(long) ceil((min(batchSize, 8192))/(2.0 * localWorkSizeK1[0])) * localWorkSizeK1[0], (long) ceil((min(previousLayer.getNumOfNodes(), 8192))/(2.0 * localWorkSizeK1[1])) * localWorkSizeK1[1]};
-			clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
+			clEnqueueNDRangeKernel(commandQueue, kernel2, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
 			//TODO (could be optimized) wait until all previously queued OpenCL commands in command_queue are issued to the associated device and have completed
 			clFinish(commandQueue);
 			//read data from GPU
@@ -610,13 +606,13 @@ public class FullyConnectedLayer implements Layer{
 		}
 	}	
 	
-	@Override
-	public cl_mem getWeightCL() {
-		if (previousLayer == null) {
-			throw new IllegalStateException("No weights on input layer!");
-		}	
-		return weightsCL;
-	}
+//	@Override
+//	public cl_mem getWeightCL() {
+//		if (previousLayer == null) {
+//			throw new IllegalStateException("No weights on input layer!");
+//		}	
+//		return weightsCL;
+//	}
 	@Override
 	public cl_mem getActivationsCL() {
 		return activationsCL;

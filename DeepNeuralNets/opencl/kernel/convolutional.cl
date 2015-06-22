@@ -2,11 +2,11 @@
 #define min(x,y)    ((x) < (y) ? (x) : (y))
 #define max(x,y)    ((x) > (y) ? (x) : (y))
 float activationFunction(float input) {
-  float output = (float) (1/(1 + exp(-input)));
+  float output = 1.0f/(1.0f + exp(-input));
   return output;
 }
 float derivative(float input) {
-    return input * (1 - input);//TODO sigmoid only
+    return input * (1.0f - input);//TODO sigmoid only
 }
 //kernel not using any local mem
 /*__kernel void forwardPass(__global float *inputFeatureMaps,

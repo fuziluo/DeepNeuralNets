@@ -1,6 +1,14 @@
 //  #define groupSize 8
+#define min(x,y)    ((x) < (y) ? (x) : (y))
 
-__kernel void weightedSumSigmoid(__global float *preActivations, __global float *weights, __global float *activations, int batchSize, int numOfPerceptrons, int weightsDim, int prevActivationDim)
+float activationFunction(float input) {
+  float output = 1.0f/(1.0f + exp(-input));
+  return output;
+}
+float derivative(float input) {
+    return input * (1.0f - input);//TODO sigmoid only
+}
+__kernel void forwardPass(__global float *preActivations, __global float *weights, __global float *activations, int batchSize, int numOfPerceptrons, int weightsDim, int prevActivationDim)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
@@ -9,7 +17,6 @@ __kernel void weightedSumSigmoid(__global float *preActivations, __global float 
     __local float shared_B[groupSize_k0_K][2 * groupSize_k0_N];
     //int N = activationDim;
 
-    #define min(x,y)    ((x) < (y) ? (x) : (y))
     for (int i = 2 * groupSize_k0_M * gid0; i < batchSize; i += 8192)
       for (int j = 2 * groupSize_k0_N * gid1; j < numOfPerceptrons; j += 8192) {
         for (int k = 0; k <= (weightsDim >= 1 ? weightsDim - 1 : 0); k += groupSize_k0_K) {
@@ -47,14 +54,14 @@ __kernel void weightedSumSigmoid(__global float *preActivations, __global float 
           barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
         }
           if (numOfPerceptrons >= lid1 + j + 1 && batchSize >= lid0 + i + 1) {
-            activations[(lid0 + i) * numOfPerceptrons + (lid1 + j)] = 1.0f / (1 + exp(-private_C[0][0]));
+            activations[(lid0 + i) * numOfPerceptrons + (lid1 + j)] = activationFunction(private_C[0][0]);
             if (numOfPerceptrons >= lid1 + j + groupSize_k0_N + 1) {
-              activations[(lid0 + i) * numOfPerceptrons + (lid1 + j + groupSize_k0_N)] = 1.0f / (1 + exp(-private_C[0][1]));
+              activations[(lid0 + i) * numOfPerceptrons + (lid1 + j + groupSize_k0_N)] = activationFunction(private_C[0][1]);
             }
             if (batchSize >= lid0 + i + groupSize_k0_M + 1) {
-              activations[(lid0 + i + groupSize_k0_M) * numOfPerceptrons + (lid1 + j)] = 1.0f / (1 + exp(-private_C[1][0]));
+              activations[(lid0 + i + groupSize_k0_M) * numOfPerceptrons + (lid1 + j)] = activationFunction(private_C[1][0]);
               if (numOfPerceptrons >= lid1 + j + groupSize_k0_N + 1){
-                activations[(lid0 + i + groupSize_k0_M) * numOfPerceptrons + (lid1 + j + groupSize_k0_N)] = 1.0f / (1 + exp(-private_C[1][1]));
+                activations[(lid0 + i + groupSize_k0_M) * numOfPerceptrons + (lid1 + j + groupSize_k0_N)] = activationFunction(private_C[1][1]);
               }
             }
           } 
@@ -62,7 +69,7 @@ __kernel void weightedSumSigmoid(__global float *preActivations, __global float 
       }
 }
 
-__kernel void weightedSumBackPropSigmoidCalcErr(__global float *error, __global float *weights, __global float *prevError, 
+__kernel void backCalcPrevErr(__global float *error, __global float *weights, __global float *prevError, 
                                           int batchSize, int prevActDim, int numOfPerceptrons, int weightsDim, __global float *prevActivations)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
@@ -72,7 +79,6 @@ __kernel void weightedSumBackPropSigmoidCalcErr(__global float *error, __global 
     float private_C[2][2];
     __local float shared_Act[2 * groupSize_k1_M][2 * groupSize_k1_N];
 
-    #define min(x,y)    ((x) < (y) ? (x) : (y))
     for (int i = 2 * groupSize_k1_M * gid0; i < batchSize; i += 8192)
       for (int j = 2 * groupSize_k1_N * gid1; j < prevActDim; j += 8192) {
         // if (prevActDim >= j + 1)
@@ -99,13 +105,13 @@ __kernel void weightedSumBackPropSigmoidCalcErr(__global float *error, __global 
           }
           if (batchSize >= lid0 + i + 1 && prevActDim >= lid1 + j + 1)
             for (int c2 = 0; c2 <= min(groupSize_k1_K - 1, numOfPerceptrons - k - 1); c2 += 1) {
-              private_C[0][0] += (shared_A[lid0][c2] * shared_B[c2][lid1]) * shared_Act[lid0][lid1] * (1 - shared_Act[lid0][lid1]);
+              private_C[0][0] += (shared_A[lid0][c2] * shared_B[c2][lid1]) * derivative(shared_Act[lid0][lid1]);
               if (prevActDim >= lid1 + j + groupSize_k1_N + 1)
-                private_C[0][1] += (shared_A[lid0][c2] * shared_B[c2][lid1 + groupSize_k1_N]) * shared_Act[lid0][lid1 + groupSize_k1_N] * (1 - shared_Act[lid0][lid1 + groupSize_k1_N]);
+                private_C[0][1] += (shared_A[lid0][c2] * shared_B[c2][lid1 + groupSize_k1_N]) * derivative(shared_Act[lid0][lid1 + groupSize_k1_N]);
               if (batchSize >= lid0 + i + groupSize_k1_M + 1) {
-                private_C[1][0] += (shared_A[lid0 + groupSize_k1_M][c2] * shared_B[c2][lid1]) * shared_Act[lid0 + groupSize_k1_M][lid1] * (1 - shared_Act[lid0 + groupSize_k1_M][lid1]);
+                private_C[1][0] += (shared_A[lid0 + groupSize_k1_M][c2] * shared_B[c2][lid1]) * derivative(shared_Act[lid0 + groupSize_k1_M][lid1]);
                 if (prevActDim >= lid1 + j + groupSize_k1_N + 1)
-                  private_C[1][1] += (shared_A[lid0 + groupSize_k1_M][c2] * shared_B[c2][lid1 + groupSize_k1_N]) * shared_Act[lid0 + groupSize_k1_M][lid1 + groupSize_k1_N] * (1 - shared_Act[lid0 + groupSize_k1_M][lid1 + groupSize_k1_N]);
+                  private_C[1][1] += (shared_A[lid0 + groupSize_k1_M][c2] * shared_B[c2][lid1 + groupSize_k1_N]) * derivative(shared_Act[lid0 + groupSize_k1_M][lid1 + groupSize_k1_N]);
               }
             }
           barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
@@ -124,7 +130,7 @@ __kernel void weightedSumBackPropSigmoidCalcErr(__global float *error, __global 
       }
 }
 
-__kernel void weightedSumBackPropSigmoidUpdateGradients(__global float *error, __global float *preActivations, __global float *gradients, int numOfPerceptrons, int weightsDim, int batchSize, int preActivationsDim)
+__kernel void backCalcGradients(__global float *error, __global float *preActivations, __global float *gradients, int numOfPerceptrons, int weightsDim, int batchSize, int preActivationsDim)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
@@ -133,7 +139,6 @@ __kernel void weightedSumBackPropSigmoidUpdateGradients(__global float *error, _
     __local float shared_B[groupSize_k2_K][2 * groupSize_k2_N];
     // int N = activationDim;
 
-    #define min(x,y)    ((x) < (y) ? (x) : (y))
     for (int i = 2 * groupSize_k2_M * gid0; i < numOfPerceptrons; i += 8192)
       for (int j = 2 * groupSize_k2_N * gid1; j < weightsDim; j += 8192) {
         for (int k = 0; k <= (batchSize >= 1 ? batchSize - 1 : 0); k += groupSize_k2_K) {
@@ -190,7 +195,6 @@ __kernel void updateWeights(__global float *gradients, __global float *weights, 
     float private_weights[1];
     float private_weightsUpdate[1];
 
-    #define floord(n,d) (((n)<0) ? -((-(n)+(d)-1)/(d)) : (n)/(d))
     for (int c0 = 128 * b0; c0 < len; c0 += 32768)
       if (len >= t0 + c0 + 1) {
         private_weights[0] = weights[t0 + c0];

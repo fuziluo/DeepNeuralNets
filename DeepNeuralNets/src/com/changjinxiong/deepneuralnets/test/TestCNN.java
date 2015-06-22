@@ -231,31 +231,28 @@ public class TestCNN {
 
 		
 		float[] tin = tp.getNextbatchInput();
-
 		float[] tout = tp.getNextBatchLabel();
 		cnn.fordwardPass(tin);
-//		float c1 = mlp.getCost(tout);
 		cnn.backPropagation(tout, 0);
 		int i = 0;
 		Layer l = l3;
 		float g1 = l.getGradients()[i];
-		double w = l.getWeight()[i];
+		float[] weights = l.getWeight();
+		double w = weights[i];
 		double e = 0.005f;
-		l.getWeight()[i] = (float) (w - e);
-//		System.out.println(l.getWeight()[i]);
+		weights[i] = (float) (w - e);
+		l.setWeight(weights);
 		cnn.fordwardPass(tin);
 		float c1 = cnn.getCost(tout, 0);
-		float[] a1 = l.getActivations();
+//		float[] a1 = l.getActivations();
 
-//		System.out.println(Arrays.toString(l.getWeight()));
-//		System.out.println(l.getWeight()[i]);
-		l.getWeight()[i] = (float) (w + e);
-//		System.out.println(Arrays.toString(l.getWeight()));
-//		System.out.println(l.getWeight()[i]);
+		weights[i] = (float) (w + e);
+		l.setWeight(weights);
+
 		cnn.fordwardPass(tin);
 		float c2 = cnn.getCost(tout, 0);
 		double g2 = (c2 - c1)/(2 * e);
-		float[] a2 = l.getActivations();
+//		float[] a2 = l.getActivations();
 //		assertArrayEquals("!!",a1,a2, 0.0001f);
 
 		System.out.println(c1+" "+c2);
