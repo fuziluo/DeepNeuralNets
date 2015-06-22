@@ -12,7 +12,7 @@ import org.jocl.*;
 
 import com.changjinxiong.deepneuralnets.nn.FullyConnectedLayer;
 public final class OpenCL {
-	private final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getName()); 
+	private final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getSimpleName()); 
 	public enum LayerType {FULLY, CONV, POOL}
 	public enum ActivationFunction {SIGMOID, RELU, SOFTPLUS, TANH}
 	private static cl_platform_id platform = platformInitializer(0);//FIXME;
@@ -137,10 +137,10 @@ public final class OpenCL {
 	 * 
 	 * @param layerType
 	 * @param actType
-	 * @param kernelDims integer array of length 9 storing 3 dimensions of 3 kernels in a specific layer
+	 * @param para integer array of length storing parameters for generating kernels
 	 * @return
 	 */
-	public static final cl_program getProgram(LayerType layerType, ActivationFunction actType , int[] kernelDims) {
+	public static final cl_program getProgram(LayerType layerType, ActivationFunction actType , int[] para) {
     	//TODO add other activation functions
 		if (layerType == LayerType.POOL) {
 			throw new IllegalArgumentException("Layer type not supported yet");
@@ -148,10 +148,11 @@ public final class OpenCL {
 		if (layerType == LayerType.FULLY && actType != ActivationFunction.SIGMOID) {
 			throw new IllegalArgumentException("Activation fuction not supported yet for this layer type");
 		}
-		if (kernelDims == null || kernelDims.length != 9) {
-			throw new IllegalArgumentException("Incorrect kernel dimensions");
-		}
-		groupSizes = getGroupSize(kernelDims);
+//		if (kernelDims == null || kernelDims.length != 9) {
+//			throw new IllegalArgumentException("Incorrect kernel dimensions");
+//		}
+        setExceptionsEnabled(true);
+		groupSizes = getGroupSize(para);
         String fileContent = "";
         String path = System.getProperty("user.dir"); 
         String kernelSource = "";
@@ -175,6 +176,20 @@ public final class OpenCL {
 			fileContent = "#define groupSize_k2_M " + groupSizes[6] + "\n" + fileContent;
 			fileContent = "#define groupSize_k2_N " + groupSizes[7] + "\n" + fileContent;
 			fileContent = "#define groupSize_k2_K " + groupSizes[8] + "\n" + fileContent;
+			if (layerType == LayerType.CONV) {
+				fileContent = "#define numOfInputFeatureMaps " + para[0] + "\n" + fileContent;
+				fileContent = "#define inputFeatureMapH " + para[1] + "\n" + fileContent;
+				fileContent = "#define inputFeatureMapW " + para[2] + "\n" + fileContent;
+				fileContent = "#define filterW " + para[3] + "\n" + fileContent;
+				fileContent = "#define filterH " + para[4] + "\n" + fileContent;
+				fileContent = "#define numOfOutputFeatureMaps " + para[5] + "\n" + fileContent;
+				fileContent = "#define outputFeatureMapH " + para[6] + "\n" + fileContent;
+				fileContent = "#define outputFeatureMapW " + para[7] + "\n" + fileContent;
+				fileContent = "#define batchSize " + para[8] + "\n" + fileContent;
+				fileContent = "#define stride " + para[9] + "\n" + fileContent;
+				fileContent = "#define addBias " + para[10] + "\n" + fileContent;
+//				System.out.println(fileContent);
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -209,24 +224,24 @@ public final class OpenCL {
 //		System.out.println(Arrays.toString(kernelDims));              
 		//calculate results for kernel0,
 		//n and k should align with cache line size
-		double ratio = kernelDims[0] * 1.0 / kernelDims[1];
-		if (ratio > maxWorkGrpSize) {
-			ratio = maxWorkGrpSize;
-		} else if (ratio < 1.0 / maxWorkGrpSize) {
-			ratio = 1.0 / maxWorkGrpSize;
-		}
-		int k0_N = (int) Math.sqrt(maxWorkGrpSize / ratio);
-		k0_N += (k0_N % 8 != 0) ? (8 - k0_N % 8) : 0;
-		int k0_M = (int) (maxWorkGrpSize / k0_N);
-		int k0_K = Math.max(k0_M, k0_N);
+//		double ratio = kernelDims[0] * 1.0 / kernelDims[1];
+//		if (ratio > maxWorkGrpSize) {
+//			ratio = maxWorkGrpSize;
+//		} else if (ratio < 1.0 / maxWorkGrpSize) {
+//			ratio = 1.0 / maxWorkGrpSize;
+//		}
+//		int k0_N = (int) Math.sqrt(maxWorkGrpSize / ratio);
+//		k0_N += (k0_N % 8 != 0) ? (8 - k0_N % 8) : 0;
+//		int k0_M = (int) (maxWorkGrpSize / k0_N);
+//		int k0_K = Math.max(k0_M, k0_N);
 		
 //		System.out.printf("%d %d %d %d\n",k0_M, k0_N, k0_K, (k0_M + k0_N)*k0_K*4*4);
 				
 		//FIXME
-		int size = 8;
+		int size = 16;
 		int[] groupSize = {
 //				k0_M, k0_N, k0_K,
-							8,32,32,
+							16,16,16,
 							size, size, size,
 							size, size, size,
 							size, size, size		

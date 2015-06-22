@@ -18,7 +18,7 @@ public class TestCNN {
 
 	@Test
 	public void testConvLayerForward() {
-		boolean useOpenCL = false;
+		boolean useOpenCL = true;
 		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false, useOpenCL);
 		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 1, cl1, null, true, useOpenCL);
 		cl1.setNextLayer(cl2);
@@ -57,14 +57,15 @@ public class TestCNN {
 		for (int i = 0; i < actCorrect.length; i++) {
 			actCorrect[i] = (float) (1 / (1 + Math.exp(-actCorrect[i])));
 		}
+		System.out.println(Arrays.toString(actCorrect));
 		System.out.println(Arrays.toString(act));
-		assertArrayEquals("!!",act,actCorrect, 0.0001f);
+		assertArrayEquals("!!",actCorrect,act, 0.0001f);
 
 	}
 
 	@Test
 	public void testConvLayerForward1() {
-		boolean useOpenCL = false;
+		boolean useOpenCL = true;
 		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false, useOpenCL);
 		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 2, cl1, null, true, useOpenCL);
 		cl1.setNextLayer(cl2);
@@ -155,14 +156,14 @@ public class TestCNN {
 	public void testForwardPassCNN() {
 		int[][] para = {{2, 0, 0, 0}, {2, 3, 3, 1}, {4}};
 		boolean addBias = true;
-		boolean useOpenCL = false;
+		boolean useOpenCL = true;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
 		cnn.setInputShape(new int[] {4, 4});
 		assertEquals(l2.getWeight().length, 20, 0);
-		assertNull(l3.getWeight());
+//		assertNull(l3.getWeight());
 		
 		float[] testInput = {	0.1f, 0.2f, 0.1f, 0.2f,
 								0.3f, 0.4f, 0.3f, 0.4f,
@@ -217,7 +218,7 @@ public class TestCNN {
 //		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
 		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
 		boolean addBias = true;
-		boolean useOpenCL = false;
+		boolean useOpenCL = true;
 		int batchSize = 100;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
@@ -236,7 +237,7 @@ public class TestCNN {
 //		float c1 = mlp.getCost(tout);
 		cnn.backPropagation(tout, 0);
 		int i = 0;
-		Layer l = l2;
+		Layer l = l3;
 		float g1 = l.getGradients()[i];
 		double w = l.getWeight()[i];
 		double e = 0.005f;
@@ -244,6 +245,8 @@ public class TestCNN {
 //		System.out.println(l.getWeight()[i]);
 		cnn.fordwardPass(tin);
 		float c1 = cnn.getCost(tout, 0);
+		float[] a1 = l.getActivations();
+
 //		System.out.println(Arrays.toString(l.getWeight()));
 //		System.out.println(l.getWeight()[i]);
 		l.getWeight()[i] = (float) (w + e);
@@ -252,10 +255,75 @@ public class TestCNN {
 		cnn.fordwardPass(tin);
 		float c2 = cnn.getCost(tout, 0);
 		double g2 = (c2 - c1)/(2 * e);
+		float[] a2 = l.getActivations();
+//		assertArrayEquals("!!",a1,a2, 0.0001f);
+
 		System.out.println(c1+" "+c2);
 		System.out.println(g1+" "+g2);
-		assertEquals(g1/g2, 1, 0.0015);
+		assertEquals(1, g1/g2, 0.0015);
 
 	}
+
+	@Test
+	public void testOpenCL() {
+		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
+//		int[][] para = {{2, 0, 0, 0}, {2, 2, 2, 1}, {2, 2, 2, 1}, {10}};
+		boolean addBias = true;
+		boolean useOpenCL = false;
+		int batchSize = 100;
+		CIFAR10DataProvider tp = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
+		float[] tin = tp.getNextbatchInput();
+		float[] tout = tp.getNextBatchLabel();
+//		float[] tin = {	0.1f, 0.2f, 0.3f,
+//				0.4f, 0.5f, 0.6f,
+//				0.7f, 0.8f, 0.9f,
+//				1.1f, 1.2f, 1.3f,
+//				1.4f, 1.5f, 1.6f,
+//				1.7f, 1.8f, 1.9f,
+//				2.1f, 2.2f, 2.3f,
+//				2.4f, 2.5f, 2.6f,
+//				2.7f, 2.8f, 2.9f,
+//				3.1f, 3.2f, 3.3f,
+//				3.4f, 3.5f, 3.6f,
+//				3.7f, 3.8f, 3.9f,
+//			};
+//		float[] tout = new float[20];
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
+		Layer l1 = cnn.getInputLayer();
+		Layer l2 = l1.getNextLayer();
+		Layer l3 = l2.getNextLayer();
+		cnn.setInputShape(new int[] {32, 32});
+//		cnn.setInputShape(new int[] {3, 3});
+		cnn.fordwardPass(tin);
+		float[] a1 = l2.getActivations();
+		
+		useOpenCL = true;
+		ConvolutionalNeuralNetwork cnn1 = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
+		Layer l11 = cnn1.getInputLayer();
+		Layer l12 = l11.getNextLayer();
+		Layer l13 = l12.getNextLayer();
+		cnn1.setInputShape(new int[] {32, 32});
+//		cnn1.setInputShape(new int[] {3, 3});
+		cnn1.fordwardPass(tin);
+		float[] a2 = l12.getActivations();
+//		System.out.println("a1 "+ a1.length + Arrays.toString(a1));
+//		System.out.println("a2 "+ a2.length + Arrays.toString(a2));
+
+		assertArrayEquals("!!",a1,a2, 0.0001f);
 	
+		cnn.backPropagation(tout, 0);
+		cnn1.backPropagation(tout, 0);
+		float[] e1 = l3.getPrevErrors();
+		float[] e2 = l13.getPrevErrors();
+//		System.out.println("e1 "+ e1.length + Arrays.toString(e1));
+//		System.out.println("e2 "+ e2.length + Arrays.toString(e2));
+		assertArrayEquals("!!",e1,e2, 0.0001f);
+		float[] g1 = l2.getGradients();
+		float[] g2 = l12.getGradients();
+//		System.out.println("g1 "+ g1.length + Arrays.toString(g1));
+//		System.out.println("g2 "+ g2.length + Arrays.toString(g2));
+		assertArrayEquals("!!",g1,g2, 0.0001f);
+
+	}
+
 }

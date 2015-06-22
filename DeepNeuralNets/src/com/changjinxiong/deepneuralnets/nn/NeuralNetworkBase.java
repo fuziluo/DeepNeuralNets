@@ -22,7 +22,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	protected Layer inputLayer = null;
 	protected Layer outputLayer = null;
 	protected boolean addBias;
-	protected final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getName()); 
+	protected final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getSimpleName()); 
 	protected float cost;
 
 	@Override

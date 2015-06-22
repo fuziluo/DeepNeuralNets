@@ -23,7 +23,7 @@ import static java.lang.Math.*;
  *
  */
 public class FullyConnectedLayer implements Layer{
-	private final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getName()); 
+	private final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getSimpleName()); 
 	private final boolean addBias;
 	private final int numOfPerceptron;
 	private float[] activations; //the activations of the perceptrons in batch
@@ -242,6 +242,9 @@ public class FullyConnectedLayer implements Layer{
 		if (previousLayer == null|| previousLayer.getPreviousLayer() == null) { 
 			throw new IllegalStateException("No prevErrors on input layer or the second layer!");
 		}
+		if (useOpenCL) {
+			clEnqueueReadBuffer(OpenCL.getCommandQueue(), prevErrorsCL, CL_TRUE, 0, prevErrors.length * Sizeof.cl_float, Pointer.to(prevErrors), 0, null, null);
+		}
 		return prevErrors;
 	}
 	@Override
@@ -249,12 +252,6 @@ public class FullyConnectedLayer implements Layer{
 		if (previousLayer == null) { //input layer
 			throw new IllegalStateException("Not forward pass calculation on input layer!");
 		}
-		
-		int newBatchSize = previousLayer.getBatchSize();
-		if ((newBatchSize != batchSize) && useOpenCL) {
-			generateKernels();
-		}
-		batchSize = newBatchSize; //update batch size
 		
 		//In the case when previous layer is a feature map, the size of output is unknown until input is fed
 		if (weights == null) {
@@ -264,7 +261,21 @@ public class FullyConnectedLayer implements Layer{
 			initializeWeights(weights);
 			gradients = new float[weights.length];
 			weightsUpdate = new float[weights.length];
+			if (useOpenCL) {
+				generateKernels();
+		        cl_context context = OpenCL.getContext();
+				weightsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
+				weightsUpdateCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weightsUpdate.length* Sizeof.cl_float, Pointer.to(weightsUpdate), null);
+//				gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, gradients.length* Sizeof.cl_float, Pointer.to(gradients), null);
+				gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY, gradients.length* Sizeof.cl_float, null, null);
+			}
 		}
+		
+		int newBatchSize = previousLayer.getBatchSize();
+		if ((newBatchSize != batchSize) && useOpenCL) {
+			generateKernels();
+		}
+		batchSize = newBatchSize; //update batch size
 
 		activations = new float[batchSize * numOfPerceptron ];
 
