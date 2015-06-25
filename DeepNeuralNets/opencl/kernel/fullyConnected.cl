@@ -1,14 +1,44 @@
 //  #define groupSize 8
 #define min(x,y)    ((x) < (y) ? (x) : (y))
 
+#define max(x,y)    ((x) > (y) ? (x) : (y))
 float activationFunction(float input) {
-  float output = 1.0f/(1.0f + exp(-input));
+  float output = 0;
+  switch (activationType) {
+  case RELU:
+    output = max(0, input);
+    break;
+  case SIGMOID:
+    output = (1/(1 + exp(-input)));
+    break;
+  case TANH:
+    output = 2/(1 + exp(-input)) - 1;
+    break;
+  default:
+    break;
+  }
   return output;
 }
+
 float derivative(float input) {
-    return input * (1.0f - input);//TODO sigmoid only
+  float output = 0;
+  switch (prevActivationType) {
+  case RELU:
+    output = input > 0 ? 1 : 0;
+    break;
+  case SIGMOID:
+    output = input * (1 - input);
+    break;
+  case TANH:
+    output = (input + 1) * (1 - input) / 2;
+    break;
+  default:
+    break;
+  }
+  return output;
 }
-__kernel void forwardPass(__global float *preActivations, __global float *weights, __global float *activations, int batchSize, int numOfPerceptrons, int weightsDim, int prevActivationDim)
+
+__kernel void forwardPass(__global float *preActivations, __global float *weights, __global float *activations, int batchSize, int numOfPerceptrons, int weightsDim, int prevActDim)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
@@ -25,10 +55,10 @@ __kernel void forwardPass(__global float *preActivations, __global float *weight
               shared_B[c0][c1] = weights[(j + c1) * weightsDim + (k + c0)];
           for (int c0 = lid0; c0 <= min(2 * groupSize_k0_M - 1, batchSize - i - 1); c0 += groupSize_k0_M)
             for (int c1 = lid1; c1 <= min(groupSize_k0_K - 1, weightsDim - k - 1); c1 += groupSize_k0_N)
-              if (weightsDim != prevActivationDim && k + c1 == weightsDim - 1)
+              if (weightsDim != prevActDim && k + c1 == weightsDim - 1)
                 shared_A[c0][c1] = 1.0f;
               else
-                shared_A[c0][c1] = preActivations[(i + c0) * prevActivationDim + (k + c1)];
+                shared_A[c0][c1] = preActivations[(i + c0) * prevActDim + (k + c1)];
           barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
           if (k == 0 && batchSize >= lid0 + i + 1 && numOfPerceptrons >= lid1 + j + 1) {
             private_C[0][0] = 0;

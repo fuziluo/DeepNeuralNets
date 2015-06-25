@@ -75,13 +75,13 @@ public class TestPooling {
 		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = true;
-		int batchSize = 100;
+		int batchSize = 1;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
 		PoolingLayer l4 = (PoolingLayer) l3.getNextLayer();
-		l4.setPoolingType(PoolingType.AVER);
+		l4.setPoolingType(PoolingType.MAX);
 		
 //		cnn.setInputShape(new int[] {28, 28});
 //		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
@@ -100,7 +100,7 @@ public class TestPooling {
 //		System.out.println(Arrays.toString(l4.getPrevErrors()));
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.005f;
+		double e = 0.00125f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.fordwardPass(tin);

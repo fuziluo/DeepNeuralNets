@@ -8,15 +8,16 @@ import java.util.logging.Logger;
 import org.jocl.*;
 
 import static org.jocl.CL.*;
+import static com.changjinxiong.deepneuralnets.nn.Util.*;
 
+import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 import com.changjinxiong.deepneuralnets.opencl.OpenCL;
-import com.changjinxiong.deepneuralnets.opencl.OpenCL.ActivationFunction;
 
 import static java.lang.Math.*;
 
 
 public class ConvolutionalLayer implements FeatureMapLayer {
-	private final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getSimpleName()); 
+	private final static Logger LOGGER = Logger.getLogger(ConvolutionalLayer.class.getSimpleName()); 
 	private final boolean addBias;
 	private final FeatureMapLayer previousLayer;
 	private Layer nextLayer;
@@ -37,7 +38,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	private float[] prevErrors; // error in the previous layer, calculated in this layer
 	private final float[] gradients; 
 	private final float[] weightsUpdate; 		
-	private ActivationFunction activationFunction;
+	private ActivationType activationType;
 	private final boolean useOpenCL;
 	private cl_mem weightsCL, weightsUpdateCL, gradientsCL;
 	private cl_mem activationsCL;
@@ -60,7 +61,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			this.gradients = new float[weights.length];
 			this.weightsUpdate = new float[weights.length];
 			//TODO change the default setting
-			activationFunction = ActivationFunction.SIGMOID;
+			activationType = ActivationType.TANH;
 			if (useOpenCL) {
 //				generateKernels();
 		        cl_context context = OpenCL.getContext();
@@ -143,9 +144,10 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		int[] para = {
 				numOfInputFeatureMaps, inputFeatureMapsShape[0], inputFeatureMapsShape[1],
 				filterHeight, filterWidth, numOfOutputFeatureMaps, outputFeatureMapsShape[0], outputFeatureMapsShape[1],
-				batchSize, stride, addBias ? 1 : 0
+				batchSize, stride, addBias ? 1 : 0, activationType.getValue(), 
+				previousLayer.getActivationType() != null ? previousLayer.getActivationType().getValue() : 99
 		}; //FIXME
-		cl_program program = OpenCL.getProgram(OpenCL.LayerType.CONV, OpenCL.ActivationFunction.SIGMOID, para);
+		cl_program program = OpenCL.getProgram(LayerType.CONV, ActivationType.SIGMOID, para);
 		//kernel for forward pass
 	    kernel0 = clCreateKernel(program, "forwardPass", null); 
 		//for gradients
@@ -156,7 +158,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		kernel3 = clCreateKernel(program, "updateWeights", null); 
 		LOGGER.log(Level.INFO, "Kernels created for {0}", this.getClass().getSimpleName());
 		clReleaseProgram(program);
-		int[] groupSize = OpenCL.getGroupSize(para);
+		int[] groupSize = OpenCL.getGroupSize(LayerType.CONV, para);
 		localWorkSizeK0 = new long[] {groupSize[0], groupSize[1]};
 		localWorkSizeK1 = new long[] {groupSize[3], groupSize[4]};
 		localWorkSizeK2 = new long[] {groupSize[6], groupSize[7]};	
@@ -169,33 +171,39 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			weights[i] = rnd.nextFloat() - 0.5f;
 		}
 	}
-	private float activationFunction(float input) {
-		float output;
-		switch (activationFunction) {
-		case RELU:
-			output = max(0, input);
-			break;
-		case SOFTPLUS:
-			output = (float) log(1 + exp(input));
-			break;
-		case SIGMOID:
-			output = (float) (1/(1 + exp(-input)));
-			break;
-		case TANH:
-			output = (float) ((1 - exp(-input)) / (1 + exp(-input)));
-			break;
-		default:
-			output = (float) (1/(1 + exp(-input)));
-			break;
-		}
-		return output;
-	}
-	public void setActivationFunction(ActivationFunction func) {
+//	private float activationFunc(float input) {
+//		float output;
+//		switch (activationType) {
+//		case RELU:
+//			output = max(0, input);
+//			break;
+//		case SOFTPLUS:
+//			output = (float) log(1 + exp(input));
+//			break;
+//		case SIGMOID:
+//			output = (float) (1/(1 + exp(-input)));
+//			break;
+//		case TANH:
+//			output = (float) ((1 - exp(-input)) / (1 + exp(-input)));
+//			break;
+//		default:
+//			output = (float) (1/(1 + exp(-input)));
+//			break;
+//		}
+//		return output;
+//	}
+	@Override
+	public void setActivationType(ActivationType type) {
 		if (previousLayer == null) { 
 			throw new IllegalStateException("No Activation Function on input layer!");
 		}	
-		activationFunction = func;
+		activationType = type;
 	}
+	@Override
+	public ActivationType getActivationType() {
+		return activationType;
+	}
+
 	
 	@Override
 	public int getNumOfFeatureMaps() {
@@ -390,7 +398,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 							int rowIndIn = m / filterWidth + row;
 							int colIndIn = m % filterWidth + col;
 							float prevAct = inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn];
-							float der = derivative(prevAct); 
+							float der = activationDerivFunc(previousLayer.getActivationType(), prevAct); 
 							prevErrors[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] += 	
 									weights[j *  weightsDim + m] * errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] * der;
 						}
@@ -403,30 +411,12 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 
 
 	}
-	private float derivative(float input) {
-		//TODO sigmoid only
-		float output = 0;
-		switch (activationFunction) {
-		case RELU:
-			break;
-		case SIGMOID:
-			output = input * (1 - input);
-			break;
-		case SOFTPLUS:
-			break;
-		case TANH:
-			break;
-		default:
-			break;
-		
-		}
-		return output;
-	}
 
 	private void backPropOpenCL() {
 		/**************************************
 		 * calculating gradients
 		 **************************************/
+		long t = System.currentTimeMillis();
         setExceptionsEnabled(true);
         cl_context context = OpenCL.getContext();
 		cl_command_queue commandQueue = OpenCL.getCommandQueue();
@@ -443,19 +433,37 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		clSetKernelArg(kernel1, 2, Sizeof.cl_mem, Pointer.to(arg2));
 //		long[] globalWorkSize = {(long) ceil(outputFeatureMapsShape[0] * outputFeatureMapsShape[1] * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
 //				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1]};
-		long[] globalWorkSize = {(long) ceil(filterHeight * filterWidth * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
-				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1]};
-		clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
+
+		int weightsDim = filterHeight * filterWidth + (addBias ? 1 : 0);
+//		long[] globalWorkSize = {(long) ceil(weightsDim * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
+//				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1]};
+//		clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
+		
+		
+		long[] localWorkSize = {4,8,8};
+		cl_mem arg3 = clCreateBuffer(context, CL_MEM_HOST_NO_ACCESS, gradients.length*batchSize* Sizeof.cl_float, null, null);
+		clSetKernelArg(kernel1, 3, Sizeof.cl_mem, Pointer.to(arg3));
+		long[] globalWorkSize = {(long) ceil(weightsDim * 1.0 / localWorkSize[0]) * localWorkSize[0], 
+						(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSize[1]) * localWorkSize[1],
+						(long) ceil(batchSize * 1.0 / localWorkSize[2]) * localWorkSize[2]
+						
+		};
+		clEnqueueNDRangeKernel(commandQueue, kernel1, 3, null, globalWorkSize, localWorkSize, 0, null, null);		
 		clFinish(commandQueue);
+		clReleaseMemObject(arg3);
+
 //		clEnqueueReadBuffer(commandQueue, gradientsCL, CL_TRUE, 0, gradients.length * Sizeof.cl_float, Pointer.to(gradients), 0, null, null);
 		if (nextLayer == null) {
 			clReleaseMemObject(activationsCL);
 			activationsCL = null;
 		}
+//		System.out.printf("  back gradients %dms \n", (System.currentTimeMillis() - t));
+		t = System.currentTimeMillis();
 		/**************************************
 		 * calculating previous error
 		 **************************************/		
 		if (previousLayer.getPreviousLayer() == null) {
+			clReleaseMemObject(arg1);
 			return;
 		}
 		prevErrors = new float[batchSize * previousLayer.getNumOfNodes()];
@@ -465,8 +473,8 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		cl_mem arg22 = previousLayer.getActivationsCL();
 //		cl_mem arg22 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, previousLayer.getActivations().length* Sizeof.cl_float, Pointer.to(previousLayer.getActivations()), null);
 		prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, prevErrors.length* Sizeof.cl_float, null, null);
+//		prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, prevErrors.length* Sizeof.cl_float, Pointer.to(prevErrors), null);
 		cl_mem arg23 = prevErrorsCL;
-//		cl_mem arg23 = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, prevErrors.length* Sizeof.cl_float, Pointer.to(prevErrors), null);
 		clSetKernelArg(kernel2, 0, Sizeof.cl_mem, Pointer.to(arg20));
 		clSetKernelArg(kernel2, 1, Sizeof.cl_mem, Pointer.to(arg21));
 		clSetKernelArg(kernel2, 2, Sizeof.cl_mem, Pointer.to(arg22));
@@ -475,12 +483,23 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 //				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK2[1]) * localWorkSizeK2[1]};
 //		globalWorkSize = new long[] {(long) ceil(outputFeatureMapsShape[0] * outputFeatureMapsShape[1] * 1.0 / localWorkSizeK2[0]) * localWorkSizeK2[0], 
 //				(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK2[1]) * localWorkSizeK2[1]};
-		globalWorkSize = new long[] {(long) ceil(inputFeatureMapsShape[0] * inputFeatureMapsShape[1] * 1.0 / localWorkSizeK2[0]) * localWorkSizeK2[0], 
-				(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK2[1]) * localWorkSizeK2[1]};
-		clEnqueueNDRangeKernel(commandQueue, kernel2, 2, null, globalWorkSize, localWorkSizeK2, 0, null, null);
+
+//		globalWorkSize = new long[] {(long) ceil(inputFeatureMapsShape[0] * inputFeatureMapsShape[1] * 1.0 / localWorkSizeK2[0]) * localWorkSizeK2[0], 
+//				(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK2[1]) * localWorkSizeK2[1]};
+//		clEnqueueNDRangeKernel(commandQueue, kernel2, 2, null, globalWorkSize, localWorkSizeK2, 0, null, null);
+
+		localWorkSize = new long [] {8,8,4};
+		globalWorkSize = new long[] {(long) ceil(inputFeatureMapsShape[0] * inputFeatureMapsShape[1] * 1.0 / localWorkSize[0]) * localWorkSize[0], 
+				(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSize[1]) * localWorkSize[1],
+				(long) ceil(batchSize * 1.0 / localWorkSize[2]) * localWorkSize[2]		
+		};
+		clEnqueueNDRangeKernel(commandQueue, kernel2, 3, null, globalWorkSize, localWorkSize, 0, null, null);
+
+		
 		clFinish(commandQueue);
 //		clEnqueueReadBuffer(commandQueue, arg23, CL_TRUE, 0, prevErrors.length * Sizeof.cl_float, Pointer.to(prevErrors), 0, null, null);
-//		clReleaseMemObject(arg1);//FIXME
+		clReleaseMemObject(arg1);
+//		System.out.printf("  back prevErr %dms \n", (System.currentTimeMillis() - t));
 
 	}
 	@Override
@@ -519,8 +538,14 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		if (previousLayer == null) { //input layer
 			throw new IllegalStateException("No forward pass calculation on input layer!");
 		}
-		batchSize = previousLayer.getBatchSize(); //update batch size
 		updateFeatureMapsShapes();
+		int newBatchSize = previousLayer.getBatchSize();
+		if (batchSize != newBatchSize) {
+			batchSize = newBatchSize; //update batch size
+			if (useOpenCL) {
+				generateKernels();
+			}
+		}
 //		System.out.println(batchSize +" "+ numOfOutputFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1]);
 		activations = new float[batchSize * numOfOutputFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1]];
 		if (useOpenCL) {
@@ -546,9 +571,17 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		clSetKernelArg(kernel0, 0, Sizeof.cl_mem, Pointer.to(arg0));
         clSetKernelArg(kernel0, 1, Sizeof.cl_mem, Pointer.to(arg1));
         clSetKernelArg(kernel0, 2, Sizeof.cl_mem, Pointer.to(arg2));
-		long[] globalWorkSize = {(long) ceil(outputFeatureMapsShape[0] * outputFeatureMapsShape[1] * 1.0 / localWorkSizeK0[0]) * localWorkSizeK0[0], 
-								(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK0[1]) * localWorkSizeK0[1]};
-		clEnqueueNDRangeKernel(commandQueue, kernel0, 2, null, globalWorkSize, localWorkSizeK0, 0, null, null);
+//		long[] globalWorkSize = {(long) ceil(outputFeatureMapsShape[0] * outputFeatureMapsShape[1] * 1.0 / localWorkSizeK0[0]) * localWorkSizeK0[0], 
+//								(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK0[1]) * localWorkSizeK0[1]};
+//		clEnqueueNDRangeKernel(commandQueue, kernel0, 2, null, globalWorkSize, localWorkSizeK0, 0, null, null);
+		long[] localWorkSize = {8,8,4};
+        long[] globalWorkSize = {(long) ceil(outputFeatureMapsShape[0] * outputFeatureMapsShape[1] * 1.0 / localWorkSize[0]) * localWorkSize[0], 
+				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSize[1]) * localWorkSize[1],
+				(long) ceil(batchSize * 1.0 / localWorkSize[2]) * localWorkSize[2]
+        };
+		clEnqueueNDRangeKernel(commandQueue, kernel0, 3, null, globalWorkSize, localWorkSize, 0, null, null);
+
+        
         clFinish(commandQueue);
 //        clEnqueueReadBuffer(commandQueue, arg2, CL_TRUE, 0, activations.length * Sizeof.cl_float, Pointer.to(activations), 0, null, null);
 	}
@@ -593,7 +626,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 						}			
 					}
 					activations[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] = 
-							activationFunction(activations[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut]);
+							activationFunc(activationType, activations[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut]);
 				}
 			}
 		}

@@ -149,7 +149,7 @@ public class TestCIFAR {
 
 	@Test
 	public void TestCIFAR10CNN() {
-		boolean useOpenCL = false;
+		boolean useOpenCL = true;
 		boolean addBias = true;
 		int batchSize = 64;
 		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
@@ -160,14 +160,13 @@ public class TestCIFAR {
 		float weightDecay = 0.05f;
 		int lrChangeCycle = 0;//10 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
 		float lrChangeRate = 0.33f;
-		int epoch = 20;
-		//TODO add pooling
-		int[][] cnnLayers = new int[][] {{3, 0, 0 ,0}, {32, 5, 5, 1},/* {32, 5, 5, 1},*/ {64, 5, 5, 1}, {10}};
+		int epoch = 1;
+		int[][] cnnLayers = new int[][] {{3, 0, 0 ,0}, {32, 5, 5, 1},{2, 2}, {64, 4, 4, 1},{2, 2}, {10}};
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, useOpenCL); 
 		cnn.setInputShape(new int[] {32, 32});
 		
-		Logger logger = Logger.getLogger("CIFAR10 traing with MLP");
-		logger.log(Level.INFO, "MLP architecture: \n"
+		Logger logger = Logger.getLogger("CIFAR10 traing with CNN");
+		logger.log(Level.INFO, "CNN architecture: \n"
 				+ "{0} {1} bias \n", new Object[] {Arrays.toString(cnnLayers), addBias ? "with" : "without"});
 
 		logger.log(Level.INFO, "Traning configuration: \n"
@@ -181,21 +180,22 @@ public class TestCIFAR {
 				+ "lrChangeCycle = {7} \n"
 				+ "lrChangeRate = {8} \n", new Object[] {useOpenCL, batchSize, (costType==0?"CE":"MSE"), epoch, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate});
 		
-//		mlp.test(trainingSet);
-//		logger.log(Level.INFO, "Pretest before training...");
-//		cnn.test(TestSet);
+		logger.log(Level.INFO, "Pretest before training...");
+		cnn.test(trainingSet);
 		
 		logger.log(Level.INFO, "Training start...");
 		cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
 
-		logger.log(Level.INFO, "Saving weights...");
-		String path = "/home/jxchang/project/records/cifar/.mlp.weights";
-		cnn.saveWeights(path);
 
 		cnn.test(trainingSet);
 //		System.out.println("Test with test set...");
 		float errorRate = cnn.test(TestSet);
-		assertEquals(0, errorRate, 0.1);		
+		assertEquals(0, errorRate, 0.1);	
+		
+		logger.log(Level.INFO, "Saving weights...");
+		String path = "/home/jxchang/project/records/cifar/.mlp.weights";
+		cnn.saveWeights(path);
+
 	}
 	
 }

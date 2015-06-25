@@ -8,10 +8,12 @@ import java.util.logging.Logger;
 
 import org.jocl.*;
 
+import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
+import com.changjinxiong.deepneuralnets.nn.Util.LayerType;
 import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 
 public class PoolingLayer implements FeatureMapLayer {
-	private final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getSimpleName()); 
+	private final static Logger LOGGER = Logger.getLogger(PoolingLayer.class.getSimpleName()); 
 	public enum PoolingType {
 		MAX(0), AVER(1);
 	    private final int value;
@@ -375,14 +377,14 @@ public class PoolingLayer implements FeatureMapLayer {
 				numOfFeatureMaps, inputFeatureMapsShape[0], inputFeatureMapsShape[1], outputFeatureMapsShape[0], outputFeatureMapsShape[1],
 				poolHeight, poolWidth, batchSize
 		}; 
-		cl_program program = OpenCL.getProgram(OpenCL.LayerType.POOL, null, para);
+		cl_program program = OpenCL.getProgram(LayerType.POOL, null, para);
 		//kernel for forward pass
 	    kernel0 = clCreateKernel(program, "forwardPass", null); 
 		//for backprop
 		kernel1 = clCreateKernel(program, "backprop", null); 
 		LOGGER.log(Level.INFO, "Kernels created for {0}", this.getClass().getSimpleName());
 		clReleaseProgram(program);
-		int[] groupSize = OpenCL.getGroupSize(para);
+		int[] groupSize = OpenCL.getGroupSize(LayerType.POOL, para);
 		localWorkSizeK0 = new long[] {groupSize[0], groupSize[1]};
 		localWorkSizeK1 = new long[] {groupSize[3], groupSize[4]};
 	}
@@ -396,6 +398,16 @@ public class PoolingLayer implements FeatureMapLayer {
 	public void setInputShape(int[] inputShape) {
 		throw new IllegalStateException("Not allowed to set input shape on pooling layer!");
 		
+	}
+
+	@Override
+	public void setActivationType(ActivationType type) {
+		throw new IllegalStateException("Not allowed to set activation type on pooling layer!");		
+	}
+
+	@Override
+	public ActivationType getActivationType() {
+		return previousLayer.getActivationType();
 	}
 
 }

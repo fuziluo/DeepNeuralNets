@@ -9,8 +9,10 @@ import org.jocl.*;
 
 import static org.jocl.CL.*;
 
+import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 
+import static com.changjinxiong.deepneuralnets.nn.Util.*;
 import static java.lang.Math.*;
 
 /**
@@ -37,6 +39,7 @@ public class FullyConnectedLayer implements Layer{
 	private Layer nextLayer;
 	private int batchSize; //batch size could change in different calculation
 	private final boolean useOpenCL;
+	private ActivationType activationType;
 	
 	private cl_kernel kernel0, kernel2, kernel1, kernel3;
 	private long[] localWorkSizeK0, localWorkSizeK1, localWorkSizeK2, localWorkSizeK3;
@@ -52,6 +55,8 @@ public class FullyConnectedLayer implements Layer{
 		this.nextLayer = nextLayer;
 		
 		if (previousLayer != null) { 
+			activationType = ActivationType.TANH;
+			//only fully connected layer has fixed input size at this time
 			if (previousLayer instanceof FullyConnectedLayer) {
 				int weightLength = previousLayer.getNumOfNodes() + (addBias ? 1 : 0);
 				weights = new float[numOfPerceptron * weightLength];
@@ -59,6 +64,7 @@ public class FullyConnectedLayer implements Layer{
 				initializeWeights(weights);
 				gradients = new float[weights.length];
 				weightsUpdate = new float[weights.length];
+				//TODO change the default setting
 				//initialize OpenCL 
 				if (useOpenCL) {
 					generateKernels();
@@ -131,11 +137,13 @@ public class FullyConnectedLayer implements Layer{
 		}		
 	
 		//dimension of input for kernel calculation, used for getting the optimal group size
-		int[] dimensions = {batchSize, numOfPerceptron, weights.length/numOfPerceptron,
+		int[] para = {batchSize, numOfPerceptron, weights.length/numOfPerceptron,
 							batchSize, previousLayer.getNumOfNodes(), numOfPerceptron,
-							numOfPerceptron, weights.length/numOfPerceptron, batchSize
+							numOfPerceptron, weights.length/numOfPerceptron, batchSize,
+							activationType.getValue(), 
+							previousLayer.getActivationType() != null ? previousLayer.getActivationType().getValue() : 99
 							};
-		cl_program program = OpenCL.getProgram(OpenCL.LayerType.FULLY, OpenCL.ActivationFunction.SIGMOID, dimensions);
+		cl_program program = OpenCL.getProgram(LayerType.FULLY, ActivationType.SIGMOID, para);
 		//kernel for forward pass
 	    kernel0 = clCreateKernel(program, "forwardPass", null); 
 		//for gradients
@@ -144,9 +152,9 @@ public class FullyConnectedLayer implements Layer{
 		kernel2 = clCreateKernel(program, "backCalcPrevErr", null); 
 		//for updateWeights
 		kernel3 = clCreateKernel(program, "updateWeights", null); 
-		LOGGER.log(Level.FINE, "Kernels created for {0}", this.getClass().getSimpleName());
+		LOGGER.log(Level.INFO, "Kernels created for {0}", this.getClass().getSimpleName());
 		clReleaseProgram(program);
-		int[] groupSize = OpenCL.getGroupSize(dimensions);
+		int[] groupSize = OpenCL.getGroupSize(LayerType.FULLY, para);
 		localWorkSizeK0 = new long[] {groupSize[0], groupSize[1]};
 		localWorkSizeK1 = new long[] {groupSize[3], groupSize[4]};
 		localWorkSizeK2 = new long[] {groupSize[6], groupSize[7]};	
@@ -387,7 +395,7 @@ public class FullyConnectedLayer implements Layer{
 					else
 						activations[i*numOfPerceptron + j] += weights[j*weightsDim + k] * previousActivations[i*prevActivationDim + k];
 				}
-				activations[i*numOfPerceptron + j] = (float) (1.0/(1 + exp(-activations[i*numOfPerceptron + j])));
+				activations[i*numOfPerceptron + j] = activationFunc(activationType, activations[i*numOfPerceptron + j]);
 			}
 //			if (addBiasNode()) {
 //				activations[i*activationDim + numOfPerceptron] = 1; //bias node
@@ -559,7 +567,7 @@ public class FullyConnectedLayer implements Layer{
 		for (int i = 0; i < batchSize; i++) {
 			for (int j = 0; j < prevActivationDim; j++) {
 				float activation = previousLayer.getActivations()[i * prevActivationDim + j];
-				float derivative = activation * (1 - activation);
+				float derivative = activationDerivFunc(previousLayer.getActivationType(), activation); 
 				for (int k = 0; k < numOfPerceptron; k++) {
 					prevErrors[i * previousLayer.getNumOfNodes() + j] += weights[k * weightsDim + j] * errors[i * numOfPerceptron + k];
 				}
@@ -623,6 +631,18 @@ public class FullyConnectedLayer implements Layer{
 			throw new IllegalStateException("No prevErrors on input layer or the second layer!");
 		}
 		return prevErrorsCL;
+	}
+
+	@Override
+	public void setActivationType(ActivationType type) {
+		if (previousLayer == null) { 
+			throw new IllegalStateException("No Activation Function on input layer!");
+		}	
+		activationType = type;
+	}
+	@Override
+	public ActivationType getActivationType() {
+		return activationType;
 	}
 
 }

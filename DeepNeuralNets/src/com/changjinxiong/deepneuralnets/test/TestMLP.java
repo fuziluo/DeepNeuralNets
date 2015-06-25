@@ -183,10 +183,11 @@ public class TestMLP {
 	
 	@Test
 	public void gradientCheck() {
-		boolean useOpenCL = true;
+		boolean useOpenCL = false;
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{784,300,10}, true, useOpenCL);
 		Layer l3 = mlp.getOutputLayer();
-		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", 2, false);
+		int costType = 1;
+		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", 100, false);
 //		float[] tin = {	0.1f, 0.2f, 0.3f, 1,
 //						0.4f, 0.5f, 0.6f, 1,
 //						0.7f, 0.8f, 0.9f, 1};
@@ -197,26 +198,26 @@ public class TestMLP {
 		float[] tout = mnistTraining.getNextBatchLabel();
 		mlp.fordwardPass(tin);
 //		float c1 = mlp.getCost(tout);
-		mlp.backPropagation(tout, 0);
+		mlp.backPropagation(tout, costType);
 		int i = 1;
 		float g1 = l3.getGradients()[i];
 		double w = l3.getWeight()[i];
-		System.out.println(w);
-		double e = 0.001f;
+		double e = 0.01f;
 		float[] tempW = l3.getWeight();
 		tempW[i] = (float) (w - e);
 		l3.setWeight(tempW);
 //		System.out.println(l3.getWeight()[i]);
 		mlp.fordwardPass(tin);
-		float c1 = mlp.getCost(tout, 0);
+		float c1 = mlp.getCost(tout, costType);
 		tempW[i] = (float) (w + e);
 		l3.setWeight(tempW);
 //		System.out.println(l3.getWeight()[i]);
 		mlp.fordwardPass(tin);
-		float c2 = mlp.getCost(tout, 0);
+		float c2 = mlp.getCost(tout, costType);
 		double g2 = (c2 - c1)/(2 * e);
+		System.out.println(c1+" "+c2);
 		System.out.println(g1+" "+g2);
-		assertEquals(1, g1/g2, 0.001);
+		assertEquals(1, g1/g2, 5e-4);
 
 	}
 	

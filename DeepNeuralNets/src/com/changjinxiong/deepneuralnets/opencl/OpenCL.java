@@ -10,11 +10,11 @@ import java.util.logging.Logger;
 
 import org.jocl.*;
 
+import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 import com.changjinxiong.deepneuralnets.nn.FullyConnectedLayer;
+import com.changjinxiong.deepneuralnets.nn.Util.LayerType;
 public final class OpenCL {
-	private final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getSimpleName()); 
-	public enum LayerType {FULLY, CONV, POOL}
-	public enum ActivationFunction {SIGMOID, RELU, SOFTPLUS, TANH}
+	private final static Logger LOGGER = Logger.getLogger(OpenCL.class.getSimpleName()); 
 	private static cl_platform_id platform = platformInitializer(0);//FIXME;
 	private static cl_device_id device = deviceInitializer(0);//FIXME;
 	private static cl_context context = contextInitializer();
@@ -140,19 +140,19 @@ public final class OpenCL {
 	 * @param para integer array of length storing parameters for generating kernels
 	 * @return
 	 */
-	public static final cl_program getProgram(LayerType layerType, ActivationFunction actType , int[] para) {
+	public static final cl_program getProgram(LayerType layerType, ActivationType actType , int[] para) {
     	//TODO add other activation functions
 //		if (layerType == LayerType.POOL) {
 //			throw new IllegalArgumentException("Layer type not supported yet");
 //		}
-		if (layerType == LayerType.FULLY && actType != ActivationFunction.SIGMOID) {
+		if (layerType == LayerType.FULLY && actType != ActivationType.SIGMOID) {
 			throw new IllegalArgumentException("Activation fuction not supported yet for this layer type");
 		}
 //		if (kernelDims == null || kernelDims.length != 9) {
 //			throw new IllegalArgumentException("Incorrect kernel dimensions");
 //		}
         setExceptionsEnabled(true);
-		groupSizes = getGroupSize(para);
+		groupSizes = getGroupSize(layerType, para);
         String fileContent = "";
         String path = System.getProperty("user.dir"); 
         String kernelSource = "";
@@ -178,6 +178,14 @@ public final class OpenCL {
 			fileContent = "#define groupSize_k2_M " + groupSizes[6] + "\n" + fileContent;
 			fileContent = "#define groupSize_k2_N " + groupSizes[7] + "\n" + fileContent;
 			fileContent = "#define groupSize_k2_K " + groupSizes[8] + "\n" + fileContent;
+			fileContent = "#define SIGMOID " + ActivationType.SIGMOID.getValue()  + "\n" + fileContent;
+			fileContent = "#define RELU " + ActivationType.RELU.getValue()  + "\n" + fileContent;
+			fileContent = "#define TANH " + ActivationType.TANH.getValue()  + "\n" + fileContent;
+			if (layerType == LayerType.FULLY) {
+				fileContent = "#define activationType " + para[9] + "\n" + fileContent;
+				fileContent = "#define prevActivationType " + para[10] + "\n" + fileContent;
+//				System.out.println(fileContent);
+			}			
 			if (layerType == LayerType.CONV) {
 				fileContent = "#define numOfInputFeatureMaps " + para[0] + "\n" + fileContent;
 				fileContent = "#define inputFeatureMapH " + para[1] + "\n" + fileContent;
@@ -190,6 +198,8 @@ public final class OpenCL {
 				fileContent = "#define batchSize " + para[8] + "\n" + fileContent;
 				fileContent = "#define stride " + para[9] + "\n" + fileContent;
 				fileContent = "#define addBias " + para[10] + "\n" + fileContent;
+				fileContent = "#define activationType " + para[11] + "\n" + fileContent;
+				fileContent = "#define prevActivationType " + para[12] + "\n" + fileContent;
 //				System.out.println(fileContent);
 			}
 			if (layerType == LayerType.POOL) {
@@ -204,40 +214,43 @@ public final class OpenCL {
 				fileContent = "#define poolHeight " + para[8] + "\n" + fileContent;
 				fileContent = "#define poolWidth " + para[9] + "\n" + fileContent;
 				fileContent = "#define batchSize " + para[10] + "\n" + fileContent;
-				
-
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+//        if (context == null) {
+//        	context = contextInitializer();
+//        }
         //Create Program With Source
 		cl_program program = clCreateProgramWithSource(context, 1, new String[]{ fileContent }, null, null);
         //Build Program
-        clBuildProgram(program, 0, null, null, null, null);
+		String options = null;
+//		options = "-cl-opt-disable";
+        clBuildProgram(program, 0, null, options, null, null);
 
 		return program;
 	}
 	public static void releaseContext() {
+		if (context == null) return;
         clReleaseContext(context);
         context = null;
 	}	
 	public static void releaseCommandQueue() {
+		if (commandQueue == null) return;
         clReleaseCommandQueue(commandQueue);
         commandQueue = null;
 	}	
-//	public static void releaseProgram() {
-//        clReleaseProgram(program);
-//        program = null;
-//	}
 	public static void releaseAll() {
-//        clReleaseProgram(program);
-        clReleaseContext(context);
-        clReleaseCommandQueue(commandQueue);
-        context = null;
-//        program = null;
-        commandQueue = null;
+		if (context != null) {
+			clReleaseContext(context);
+	        context = null;
+		}
+		if (commandQueue != null) {
+			clReleaseCommandQueue(commandQueue);
+	        commandQueue = null;
+		}
 	}
-	public static int[] getGroupSize(int[] kernelDims) {
+	public static int[] getGroupSize(LayerType layerType, int[] kernelDims) {
 //		System.out.println(Arrays.toString(kernelDims));              
 		//calculate results for kernel0,
 		//n and k should align with cache line size
@@ -255,14 +268,30 @@ public final class OpenCL {
 //		System.out.printf("%d %d %d %d\n",k0_M, k0_N, k0_K, (k0_M + k0_N)*k0_K*4*4);
 				
 		//FIXME
-		int size = 16;
-		int[] groupSize = {
-//				k0_M, k0_N, k0_K,
-							16,16,16,
+		int[] groupSize = null;
+		if (layerType == LayerType.FULLY) {
+		int size = 8;
+		groupSize = new int[] {
 							size, size, size,
 							size, size, size,
-							size, size, size		
+							size, size, size,
 							};
+		} else if (layerType == LayerType.POOL) {
+			int size = 8;
+			groupSize = new int[] {
+								size, size, size,
+								size, size, size,
+								size, size, size,
+								};
+			
+		} else if (layerType == LayerType.CONV) {
+			groupSize = new int[] {
+								16,16,60,
+								64, 1, 60,
+								8, 8, 60,
+//								size, size, size		
+								};
+		}
 
 		return groupSize;	
 	}

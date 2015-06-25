@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 import com.changjinxiong.deepneuralnets.test.DataProvider;
 
@@ -22,7 +23,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	protected Layer inputLayer = null;
 	protected Layer outputLayer = null;
 	protected boolean addBias;
-	protected final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getSimpleName()); 
+	protected final static Logger LOGGER = Logger.getLogger(NeuralNetwork.class.getSimpleName()); 
 	protected float cost;
 
 	@Override
@@ -52,7 +53,9 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
 			currentLayer = currentLayer.getNextLayer();
+			long t = System.currentTimeMillis();
 			currentLayer.forwardPass();
+			System.out.printf("  forward %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
 		}
 	}
 	/* (non-Javadoc)
@@ -60,20 +63,79 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	 */
 	@Override
 	public void backPropagation(float[] labels, int costType) {
+		long t = System.currentTimeMillis();
 		setError(labels, costType);
+//		System.out.printf("  calc err %dms \n", (System.currentTimeMillis() - t));
 		Layer currentLayer = outputLayer;
 		while (currentLayer.getPreviousLayer() != null) {
+			t = System.currentTimeMillis();
 			currentLayer.backpropagation();
+//			System.out.printf("  back %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
 			currentLayer = currentLayer.getPreviousLayer();
 		}		
 	}
 	
 	@Override
 	public void setError(float[] labels, int costType) {
+		float[] activations = outputLayer.getActivations();
+		if (activations.length != labels.length) {
+			throw new IllegalArgumentException("incorrect label length!");
+		}
 		//calculate the error i.e. the derivative of cost function
+		ActivationType actType = outputLayer.getActivationType();
+		float[] error = null;
+		switch (actType) {
+		case RELU:
+			break;
+		case SIGMOID:
+			error = getSigmoidErr(labels, activations, costType);
+			break;
+		case TANH:
+			error = getTanhErr(labels, activations, costType);
+			break;
+		default:
+			break;
+		
+		}
+		
+
+		//set the error
+		outputLayer.setErrors(error); 
+	}
+	private float[] getTanhErr(float[] labels, float[] activations, int costType) {
 		int labelSize = outputLayer.getNumOfNodes();
 		int batchSize = outputLayer.getBatchSize();
-		float[] activations = outputLayer.getActivations();
+		float[] error = new float[labelSize * batchSize];
+		//calculate the error
+		if (costType == 0) {
+			for (int i = 0; i < batchSize; i++) {
+				for (int j = 0; j < labelSize; j++) {
+					/*****************************
+					 * derivative of cross entropy
+					 *****************************/
+					error[i * labelSize + j] = (activations[i * labelSize + j] -  2 * labels[i * labelSize + j] + 1);
+//					error[i * labelSize + j] = (-labels[i * labelSize + j] + (activations[i * labelSize + j] + 1) / 2);
+				}
+			}
+		} else if (costType == 1) {
+			for (int i = 0; i < batchSize; i++) {
+				for (int j = 0; j < labelSize; j++) {
+					/*****************************************
+					 * derivative of MSE
+					 *****************************************/
+					error[i * labelSize + j] = (activations[i * labelSize + j] - 2 * labels[i * labelSize + j] + 1);
+					error[i * labelSize + j] *= (1 - activations[i * labelSize + j] * activations[i * labelSize + j]) / 2;
+				}
+			}			
+		} else {
+			throw new IllegalArgumentException("Incorrect cost type!");
+		}
+		return error;
+	}
+	private float[] getSigmoidErr(float[] labels, float[] activations,
+			int costType) {
+		int labelSize = outputLayer.getNumOfNodes();
+		int batchSize = outputLayer.getBatchSize();
 		float[] error = new float[labelSize * batchSize];
 		//calculate the error
 		if (costType == 0) {
@@ -98,8 +160,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		} else {
 			throw new IllegalArgumentException("Incorrect cost type!");
 		}
-		//set the error
-		outputLayer.setErrors(error); 
+		return error;
 	}
 	/* (non-Javadoc)
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#updateWeights(float, float)
@@ -109,7 +170,9 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
 			currentLayer = currentLayer.getNextLayer();
+			long t = System.currentTimeMillis();
 			currentLayer.updateWeights(learningRate, momentum, weightDecay);
+//			System.out.printf("  updateWeights %dms \n", (System.currentTimeMillis() - t));
 		}
 	}
 	/* (non-Javadoc)
@@ -181,11 +244,12 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		if (lrChangCycle > 0 && (lrChangRate <= 0 || lrChangRate >= 1)) {
 			throw new IllegalArgumentException("lrChangRate should be within (0, 1)");
 		}
+		LOGGER.log(Level.INFO, "Training start...");
 		dp.reset();
-		boolean addBias = false;
-		if (this instanceof MultiLayerPerceptron) {
-			addBias = this.addBias;
-		}
+//		boolean addBias = false;
+//		if (this instanceof MultiLayerPerceptron) {
+//			addBias = this.addBias;
+//		}
 		float baseLr = learningRate;
 		float averageCost = 0;
 		int lrDecayTimesLimit = 1;
@@ -193,9 +257,12 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		for (int i = 0, j = 0, k = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize(), j++, k++) {
 			fordwardPass(dp.getNextbatchInput());
 			//monitor the cost
+			long t = System.currentTimeMillis();
 			float [] batchLabels = dp.getNextBatchLabel();
 			float cost = getCost(batchLabels, costType);
+//			System.out.printf("  calc cost %dms \n", (System.currentTimeMillis() - t));
 			backPropagation(batchLabels, costType);
+			
 			averageCost += cost;
 			if (k >= dp.getDatasetSize() / dp.getBatchSize()) {
 				averageCost /= k;
@@ -212,10 +279,9 @@ public class NeuralNetworkBase implements NeuralNetwork {
 				lrDecayTimes++;
 			}
 			updateWeights(baseLr, momentum, weightDecay);	
+
 		}
-//		if (useOpenCL) {
-//			cleanOpenCLKernels();
-//		}
+		LOGGER.log(Level.INFO, "Training finished");
 	}
 	/* (non-Javadoc)
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#getCost(float[])
@@ -230,6 +296,58 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		if (activations.length != labels.length) {
 			throw new IllegalArgumentException("incorrect label length!");
 		}
+		ActivationType actType = outputLayer.getActivationType();
+		switch (actType) {
+		case RELU:
+			//TODO
+			break;
+		case SIGMOID:
+			cost = getSigmoidCost(labels, activations, costType);
+			break;
+		case TANH:
+			cost = getTanhCost(labels, activations, costType);
+			break;
+		default:
+			break;
+		
+		}
+		return cost;
+	}
+
+
+	private float getTanhCost(float[] labels, float[] activations, int costType) {
+		float result = 0;
+		int batchSize = outputLayer.getBatchSize();
+		int labelSize = outputLayer.getNumOfNodes();
+		if (costType == 0) {
+			for (int i = 0; i < labelSize; i++) {
+				float singleCost = 0;
+				for (int j = 0; j < batchSize; j++) {
+//					singleCost += (labels[j * labelSize + i] == 1) ? 2 * log(1 + activations[j * labelSize + i]) : (log(1 + activations[j * labelSize + i]) + log(1 - activations[j * labelSize + i]));
+					singleCost += (2 * labels[j * labelSize + i]) * log(1 + activations[j * labelSize + i]) + 
+							(2 - 2 * labels[j * labelSize + i]) * log(1 - activations[j * labelSize + i]);
+//					singleCost += (labels[j * labelSize + i] == 1) ? log((activations[j * labelSize + i] + 1) / 2) : log((1 - activations[j * labelSize + i]) / 2);
+
+				}
+				result -= singleCost/batchSize;
+			}
+		} else if (costType == 1) {
+			for (int i = 0; i < labelSize; i++) {
+				float singleCost = 0;
+				for (int j = 0; j < batchSize; j++) {
+					/************************************************
+					 * MSE cost
+					 ************************************************/
+					singleCost += -0.5*pow(2 * labels[j * labelSize + i] - activations[j * labelSize + i] - 1, 2);
+				}
+				result -= singleCost/batchSize;
+			}			
+		} else {
+			throw new IllegalArgumentException("Incorrect cost type!");
+		}
+		return result;
+	}
+	private float getSigmoidCost(float[] labels, float[] activations, int costType) {
 		float result = 0;
 		int batchSize = outputLayer.getBatchSize();
 		int labelSize = outputLayer.getNumOfNodes();
@@ -264,11 +382,8 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		} else {
 			throw new IllegalArgumentException("Incorrect cost type!");
 		}
-		cost = result;
 		return result;
 	}
-
-
 	@Override
 	public void saveWeights(String path) {
 //		String name = "." + this.getClass().getSimpleName() + ".weights";
@@ -279,6 +394,10 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			int bufferSize = 0;
 			float weights[];
 			do {
+				if (layer instanceof PoolingLayer) {
+					layer = layer.getNextLayer();
+					continue; 
+				}
 				weights = layer.getWeight();
 				bufferSize = 4 * weights.length;
 				ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
@@ -303,6 +422,10 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			int bufferSize = 0;
 			float weights[];
 			do {
+				if (layer instanceof PoolingLayer) {
+					layer = layer.getNextLayer();
+					continue; 
+				}
 				weights = layer.getWeight();
 				bufferSize = 4 * weights.length;
 				ByteBuffer buffer = ByteBuffer.allocate(bufferSize);

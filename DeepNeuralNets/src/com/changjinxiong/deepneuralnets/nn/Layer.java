@@ -2,6 +2,8 @@ package com.changjinxiong.deepneuralnets.nn;
 
 import org.jocl.cl_mem;
 
+import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
+
 /**
  * 
  * @author jxchang
@@ -26,4 +28,6 @@ public interface Layer {
 //	public cl_mem getWeightCL();
 	public cl_mem getActivationsCL();
 	public cl_mem getPrevErrorsCL();
+	public void setActivationType(ActivationType type);
+	public ActivationType getActivationType();
 }

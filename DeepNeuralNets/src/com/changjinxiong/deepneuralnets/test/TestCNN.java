@@ -12,6 +12,8 @@ import com.changjinxiong.deepneuralnets.nn.FeatureMapLayer;
 import com.changjinxiong.deepneuralnets.nn.Layer;
 import com.changjinxiong.deepneuralnets.nn.MultiLayerPerceptron;
 import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
+import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
+import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 import com.changjinxiong.deepneuralnets.test.CIFAR10DataProvider.DatasetType;
 
 public class TestCNN {
@@ -44,6 +46,7 @@ public class TestCNN {
 							0.8f, 0.9f, 1,
 							};
 		cl2.setWeight(weights);
+		cl2.setActivationType(ActivationType.SIGMOID);
 		cl2.forwardPass();
 		float[] act = cl2.getActivations();
 		float[] actCorrect = {	2.74f, 2.94f, 
@@ -60,6 +63,7 @@ public class TestCNN {
 		System.out.println(Arrays.toString(actCorrect));
 		System.out.println(Arrays.toString(act));
 		assertArrayEquals("!!",actCorrect,act, 0.0001f);
+		OpenCL.releaseAll();
 
 	}
 
@@ -69,6 +73,7 @@ public class TestCNN {
 		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false, useOpenCL);
 		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 2, cl1, null, true, useOpenCL);
 		cl1.setNextLayer(cl2);
+		cl2.setActivationType(ActivationType.SIGMOID);
 		int[] inputShape = {3, 5};
 		cl1.setInputShape(inputShape);
 		float[] inputs = {	0.1f, 0.2f, 0.3f, 0.2f, 0.3f,
@@ -103,7 +108,7 @@ public class TestCNN {
 		}
 		System.out.println(Arrays.toString(act));
 		assertArrayEquals("!!",act,actCorrect, 0.0001f);
-
+		OpenCL.releaseAll();
 	}
 	
 	@Test
@@ -118,7 +123,7 @@ public class TestCNN {
 		Layer l4 = l3.getNextLayer();
 		Layer l5 = l4.getNextLayer();
 		l1.setInputShape(new int[] {4, 4});
-		
+
 		assertEquals(l2.getWeight().length, 40, 0);
 		assertEquals(l3.getWeight().length, 15, 0);
 		assertNull(l4.getWeight());
@@ -164,6 +169,8 @@ public class TestCNN {
 		cnn.setInputShape(new int[] {4, 4});
 		assertEquals(l2.getWeight().length, 20, 0);
 //		assertNull(l3.getWeight());
+		l2.setActivationType(ActivationType.SIGMOID);
+		l3.setActivationType(ActivationType.SIGMOID);
 		
 		float[] testInput = {	0.1f, 0.2f, 0.1f, 0.2f,
 								0.3f, 0.4f, 0.3f, 0.4f,
@@ -211,14 +218,16 @@ public class TestCNN {
 		System.out.println(Arrays.toString(act3));
 
 		assertArrayEquals("!!",act3,actCorrect, 0.0001f);
+		OpenCL.releaseAll();
 	}
 
 	@Test
 	public void gradientCheck() {
 //		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
-		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
+		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {100, 3, 3, 1}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = true;
+		int costType = 1;
 		int batchSize = 100;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
@@ -229,28 +238,30 @@ public class TestCNN {
 		cnn.setInputShape(new int[] {32, 32});
 		CIFAR10DataProvider tp = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
 
+
 		
 		float[] tin = tp.getNextbatchInput();
 		float[] tout = tp.getNextBatchLabel();
 		cnn.fordwardPass(tin);
-		cnn.backPropagation(tout, 0);
-		int i = 0;
-		Layer l = l3;
+		
+		cnn.backPropagation(tout, costType);
+		int i = 2;
+		Layer l = l2;
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.005f;
+		double e = 0.001f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.fordwardPass(tin);
-		float c1 = cnn.getCost(tout, 0);
+		float c1 = cnn.getCost(tout, costType);
 //		float[] a1 = l.getActivations();
 
 		weights[i] = (float) (w + e);
 		l.setWeight(weights);
 
 		cnn.fordwardPass(tin);
-		float c2 = cnn.getCost(tout, 0);
+		float c2 = cnn.getCost(tout, costType);
 		double g2 = (c2 - c1)/(2 * e);
 //		float[] a2 = l.getActivations();
 //		assertArrayEquals("!!",a1,a2, 0.0001f);
@@ -258,16 +269,18 @@ public class TestCNN {
 		System.out.println(c1+" "+c2);
 		System.out.println(g1+" "+g2);
 		assertEquals(1, g1/g2, 0.0015);
-
+//		assertEquals(0, (g1-g2)/(Math.abs(g1)+Math.abs(g2)), 0.000015);
+		OpenCL.releaseAll();
 	}
 
 	@Test
 	public void testOpenCL() {
-		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
+		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {20, 3, 3, 1}, {10}};
 //		int[][] para = {{2, 0, 0, 0}, {2, 2, 2, 1}, {2, 2, 2, 1}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = false;
 		int batchSize = 100;
+		int costType = 1;
 		CIFAR10DataProvider tp = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
 		float[] tin = tp.getNextbatchInput();
 		float[] tout = tp.getNextBatchLabel();
@@ -308,8 +321,8 @@ public class TestCNN {
 
 		assertArrayEquals("!!",a1,a2, 0.0001f);
 	
-		cnn.backPropagation(tout, 0);
-		cnn1.backPropagation(tout, 0);
+		cnn.backPropagation(tout, costType);
+		cnn1.backPropagation(tout, costType);
 		float[] e1 = l3.getPrevErrors();
 		float[] e2 = l13.getPrevErrors();
 //		System.out.println("e1 "+ e1.length + Arrays.toString(e1));
@@ -319,7 +332,8 @@ public class TestCNN {
 		float[] g2 = l12.getGradients();
 //		System.out.println("g1 "+ g1.length + Arrays.toString(g1));
 //		System.out.println("g2 "+ g2.length + Arrays.toString(g2));
-		assertArrayEquals("!!",g1,g2, 0.0001f);
+		assertArrayEquals("!!",g1,g2, 0.001f);
+		OpenCL.releaseAll();
 
 	}
 
