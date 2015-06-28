@@ -35,6 +35,147 @@ float derivative(float input) {
   }
   return output;
 }
+
+void atomic_add_global(volatile global float *source, const float operand) {
+    union {
+        unsigned int intVal;
+        float floatVal;
+    } newVal;
+    union {
+        unsigned int intVal;
+        float floatVal;
+    } prevVal;
+ 
+    do {
+        prevVal.floatVal = *source;
+        newVal.floatVal = prevVal.floatVal + operand;
+    } while (atomic_cmpxchg((volatile global unsigned int *)source, prevVal.intVal, newVal.intVal) != prevVal.intVal);
+}
+
+#ifdef padding
+  __kernel void forwardPass(__global float *inputFeatureMaps,
+                              __global float *weights, 
+                              __global float *outputFeatureMaps)
+  {
+    int gb0 = get_global_id(0), gb1 = get_global_id(1), gb2 = get_global_id(2);
+    int weightsDim = filterW * filterH + (addBias ? 1 : 0);
+
+    if (gb0 < outputFeatureMapH * outputFeatureMapW && gb1 < numOfOutputFeatureMaps && gb2 < batchSize) {
+      int batchOffsetIn = gb2 * numOfInputFeatureMaps * inputFeatureMapH * inputFeatureMapW;
+      int batchOffsetOut = gb2 * (numOfOutputFeatureMaps * outputFeatureMapH * outputFeatureMapW);
+      int featureMapOffsetOut = batchOffsetOut + gb1 * outputFeatureMapH * outputFeatureMapW;
+      int rowOut = gb0 / outputFeatureMapW;
+      int colOut = gb0 % outputFeatureMapW;
+      float out = 0;
+      for (int k = 0; k < numOfInputFeatureMaps; k++) {
+        int featureMapOffsetIn = batchOffsetIn + k * inputFeatureMapH * inputFeatureMapW;
+        // for (int m = 0; m < filterW * filterH; m++) {
+        //   int rowIn = m / filterW + rowOut * stride;
+        //   int colIn = m % filterW + colOut * stride;
+        //   if (rowIn < inputFeatureMapH && colIn < inputFeatureMapW) {
+        //     out += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] * weights[gb1 *  weightsDim + m];
+        //   }
+        // }
+        for (int r = 0; r < filterH; r++) {
+          for (int c = 0; c < filterW; c++) {
+            int rowIn = r + rowOut * stride;
+            int colIn = c + colOut * stride;
+            if (rowIn < inputFeatureMapH && colIn < inputFeatureMapW) {
+              out += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] * weights[gb1 *  weightsDim + r * filterW + c];
+            }
+          }
+        }
+        if (addBias) {
+          out += weights[gb1 *  weightsDim + weightsDim - 1];
+        }
+      }
+      outputFeatureMaps[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] = activationFunction(out);
+    }
+  }
+
+  // 3 dimension version, use local mem as buffer
+  __kernel void backCalcGradients(__global float *inputFeatureMaps,
+                                    __global float *errors, 
+                                    __global float *gradients)
+  {
+    int lo1 = get_local_id(1), lo2 = get_local_id(2);
+    int gp1 = get_group_id(1), gp2 = get_group_id(2);
+    int gb0 = get_global_id(0), gb1 = get_global_id(1), gb2 = get_global_id(2);
+    int weightsDim = filterW * filterH + (addBias ? 1 : 0);
+    __local float gradients_buff[groupSize_k1_K * groupSize_k1_N * (filterW * filterH + (addBias ? 1 : 0))];
+    if (gb0 < weightsDim && gb1 < numOfOutputFeatureMaps && gb2 < batchSize) {
+      float out = 0;
+      int batchOffsetIn = gb2 * numOfInputFeatureMaps * inputFeatureMapH * inputFeatureMapW;
+      int batchOffsetOut = gb2 * (numOfOutputFeatureMaps * outputFeatureMapH * outputFeatureMapW);
+      int featureMapOffsetOut = batchOffsetOut + gb1 * outputFeatureMapH * outputFeatureMapW;
+      for (int j = 0; j < outputFeatureMapH * outputFeatureMapW; j++) {
+        int rowOut = j / outputFeatureMapW;
+        int colOut = j % outputFeatureMapW;
+        for (int k = 0; k < numOfInputFeatureMaps; k++) {
+          int featureMapOffsetIn = batchOffsetIn + k * inputFeatureMapH * inputFeatureMapW;
+          if (gb0 < weightsDim - 1) {
+            int rowIn = gb0 / filterW + rowOut * stride;
+            int colIn = gb0 % filterW + colOut * stride;
+            if (rowIn < inputFeatureMapH && colIn < inputFeatureMapW) {
+              out += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] 
+              * errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+            }
+          } else if (addBias == 1) {
+            out += errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+          }
+        }
+      }
+      gradients_buff[(lo1 * weightsDim + gb0) + groupSize_k1_N * weightsDim * lo2] = out;
+      barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+      if (lo2 == 0) {
+        float result = 0;
+        for (int i = 0; i < groupSize_k1_K && gp2 * groupSize_k1_K + i < batchSize; i++) {
+            result += gradients_buff[(lo1 * weightsDim + gb0) + groupSize_k1_N * weightsDim * i];
+        }
+        atomic_add_global(&gradients[gb1 * weightsDim + gb0], result);
+      }
+    }
+  }
+
+
+
+  //parallel on 3 dimension, seems to be much faster!!!
+  __kernel void backCalcPrevErr(__global float *weights,
+                                    __global float *errors, 
+                                    __global float *inputFeatureMaps, 
+                                    __global float *prevErrors)
+  {
+    int lo0 = get_local_id(0), lo1 = get_local_id(1);
+    int gb0 = get_global_id(0), gb1 = get_global_id(1), gb2 = get_global_id(2);
+    int weightsDim = filterW * filterH + (addBias ? 1 : 0);
+
+    if (gb0 < inputFeatureMapH * inputFeatureMapW && gb1 < numOfInputFeatureMaps && gb2 < batchSize) {
+      int batchOffsetIn = gb2 * numOfInputFeatureMaps * inputFeatureMapH * inputFeatureMapW;
+      int batchOffsetOut = gb2 * (numOfOutputFeatureMaps * outputFeatureMapH * outputFeatureMapW);
+      int featureMapOffsetIn = batchOffsetIn + gb1 * inputFeatureMapH * inputFeatureMapW;
+      int rowIn = gb0 / inputFeatureMapW;
+      int colIn = gb0 % inputFeatureMapW;
+      float der = derivative(inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn]);
+      float out = 0;
+      int c = (max(0, colIn - filterW + 1) % stride) ? (max(0, colIn - filterW + 1) + stride - max(0, colIn - filterW + 1) % stride) : max(0, colIn - filterW + 1);
+      for ( ; c <= colIn; c += stride) {
+        int r = (max(0, rowIn - filterH + 1) % stride) ? (max(0, rowIn - filterH + 1) + stride - max(0, rowIn - filterH + 1) % stride) : max(0, rowIn - filterH + 1);
+        for ( ; r <= rowIn; r += stride) {
+          int rowOut = r / stride;
+          int colOut = c / stride;
+          int k = (rowIn - r) * filterW + colIn - c;
+          for (int j = 0; j < numOfOutputFeatureMaps; j++) {
+            int featureMapOffsetOut = batchOffsetOut + j * outputFeatureMapH * outputFeatureMapW;
+            out += weights[j * weightsDim + k] * errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] * der;
+          }
+        }
+      }
+      prevErrors[featureMapOffsetIn + gb0] = out;
+    }
+  } 
+
+#else
+
 //kernel not using any local mem
 /*__kernel void forwardPass(__global float *inputFeatureMaps,
                             __global float *weights, 
@@ -85,11 +226,13 @@ __kernel void forwardPass(__global float *inputFeatureMaps,
       float out = 0;
       for (int k = 0; k < numOfInputFeatureMaps; k++) {
         int featureMapOffsetIn = batchOffsetIn + k * inputFeatureMapH * inputFeatureMapW;
-        for (int m = 0; m < filterW * filterH; m++) {
-          int rowIn = m / filterW + rowOut * stride;
-          int colIn = m % filterW + colOut * stride;
-          out += 
-              inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] * weights[gb1 *  weightsDim + m];
+        for (int r = 0; r < filterH; r++) {
+          for (int c = 0; c < filterW; c++) {
+            int rowIn = r + rowOut * stride;
+            int colIn = c + colOut * stride;
+            out += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] 
+                    * weights[gb1 *  weightsDim + r * filterW + c];
+          }
         }
         if (addBias) {
           out += weights[gb1 *  weightsDim + weightsDim - 1];
@@ -227,14 +370,13 @@ __kernel void forwardPass(__global float *inputFeatureMaps,
     gradients[gb1 * weightsDim + gb0] = out;
   }
 }*/
-
 // 3 dimension version, use global mem as buffer
-__kernel void backCalcGradients(__global float *inputFeatureMaps,
+/*__kernel void backCalcGradients(__global float *inputFeatureMaps,
                                   __global float *errors, 
                                   __global float *gradients,
-                                  __global volatile float *gradients_buff)
+                                  __global float *gradients_buff)
 {
-  // int lo0 = get_local_id(0), lo1 = get_local_id(1);
+  int lo0 = get_local_id(0), lo1 = get_local_id(1), lo2 = get_local_id(2);
   int gb0 = get_global_id(0), gb1 = get_global_id(1), gb2 = get_global_id(2);
   int weightsDim = filterW * filterH + (addBias ? 1 : 0);
   if (gb0 < weightsDim && gb1 < numOfOutputFeatureMaps && gb2 < batchSize) {
@@ -258,8 +400,8 @@ __kernel void backCalcGradients(__global float *inputFeatureMaps,
       }
     }
     gradients_buff[(gb1 * weightsDim + gb0) + numOfOutputFeatureMaps * weightsDim * gb2] = out;
-    barrier(CLK_GLOBAL_MEM_FENCE);
-    if (gb2 == 0) {
+    barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+    if (lo2 == 0) {
       float result = 0;
       for (int i = 0; i < batchSize; i++) {
         result += gradients_buff[(gb1 * weightsDim + gb0) + numOfOutputFeatureMaps * weightsDim * i];
@@ -267,7 +409,50 @@ __kernel void backCalcGradients(__global float *inputFeatureMaps,
       gradients[gb1 * weightsDim + gb0] = result;
     }
   }
+}*/
+
+// 3 dimension version, use local mem as buffer
+__kernel void backCalcGradients(__global float *inputFeatureMaps,
+                                  __global float *errors, 
+                                  __global float *gradients)
+{
+  int lo1 = get_local_id(1), lo2 = get_local_id(2);
+  int gp1 = get_group_id(1), gp2 = get_group_id(2);
+  int gb0 = get_global_id(0), gb1 = get_global_id(1), gb2 = get_global_id(2);
+  int weightsDim = filterW * filterH + (addBias ? 1 : 0);
+  __local float gradients_buff[groupSize_k1_K * groupSize_k1_N * (filterW * filterH + (addBias ? 1 : 0))];
+  if (gb0 < weightsDim && gb1 < numOfOutputFeatureMaps && gb2 < batchSize) {
+    float out = 0;
+    int batchOffsetIn = gb2 * numOfInputFeatureMaps * inputFeatureMapH * inputFeatureMapW;
+    int batchOffsetOut = gb2 * (numOfOutputFeatureMaps * outputFeatureMapH * outputFeatureMapW);
+    int featureMapOffsetOut = batchOffsetOut + gb1 * outputFeatureMapH * outputFeatureMapW;
+    for (int j = 0; j < outputFeatureMapH * outputFeatureMapW; j++) {
+      int rowOut = j / outputFeatureMapW;
+      int colOut = j % outputFeatureMapW;
+      for (int k = 0; k < numOfInputFeatureMaps; k++) {
+        int featureMapOffsetIn = batchOffsetIn + k * inputFeatureMapH * inputFeatureMapW;
+        if (gb0 < weightsDim - 1) {
+          int rowIn = gb0 / filterW + rowOut * stride;
+          int colIn = gb0 % filterW + colOut * stride;
+          out += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] 
+          * errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+        } else if (addBias == 1) {
+          out += errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+        }
+      }
+    }
+    gradients_buff[(lo1 * weightsDim + gb0) + groupSize_k1_N * weightsDim * lo2] = out;
+    barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+    if (lo2 == 0) {
+      float result = 0;
+      for (int i = 0; i < groupSize_k1_K && gp2 * groupSize_k1_K + i < batchSize; i++) {
+          result += gradients_buff[(lo1 * weightsDim + gb0) + groupSize_k1_N * weightsDim * i];
+      }
+      atomic_add_global(&gradients[gb1 * weightsDim + gb0], result);
+    }
+  }
 }
+
 
 // incomplete, need to use atomic operation
 // __kernel void backCalcGradients(__global float *inputFeatureMaps,
@@ -437,8 +622,7 @@ __kernel void backCalcPrevErr(__global float *weights,
         }
       }
     }
-    // barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);  
-    prevErrors[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] = out;
+    prevErrors[featureMapOffsetIn + gb0] = out;
   }
 } 
 
@@ -501,6 +685,8 @@ __kernel void backCalcPrevErr(__global float *weights,
 //   }
 // } 
 
+#endif
+
 __kernel void updateWeights(__global float *gradients, __global float *weights, __global float *weightsUpdate, float learningRate, float momentum, float weightDecay_batchSize, int len)
 {
     int b0 = get_group_id(0);
@@ -508,7 +694,6 @@ __kernel void updateWeights(__global float *gradients, __global float *weights, 
     float private_weights[1];
     float private_weightsUpdate[1];
 
-    #define floord(n,d) (((n)<0) ? -((-(n)+(d)-1)/(d)) : (n)/(d))
     for (int c0 = 128 * b0; c0 < len; c0 += 32768)
       if (len >= t0 + c0 + 1) {
         private_weights[0] = weights[t0 + c0];
