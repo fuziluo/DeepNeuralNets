@@ -1,7 +1,7 @@
 package com.changjinxiong.deepneuralnets.nn;
 
 public class ConvolutionalNeuralNetwork extends NeuralNetworkBase {
-	public ConvolutionalNeuralNetwork(int[][] layerParameters, boolean addBias, boolean useOpenCL) {
+	public ConvolutionalNeuralNetwork(int[][] layerParameters, boolean addBias, boolean padding, boolean useOpenCL) {
 		// TODO Auto-generated constructor stub
 		if (layerParameters.length < 2) {
 			throw new IllegalArgumentException("At least 2 layers");
@@ -20,8 +20,10 @@ public class ConvolutionalNeuralNetwork extends NeuralNetworkBase {
 				if (!(outputLayer instanceof FeatureMapLayer)) {
 					throw new IllegalArgumentException("Convolutional layer must be connected to a FeatureMap layer");
 				}
-				newLayer = new ConvolutionalLayer(layerParameters[i][0], layerParameters[i][1],layerParameters[i][2],layerParameters[i][3],
+				ConvolutionalLayer newConvLayer = new ConvolutionalLayer(layerParameters[i][0], layerParameters[i][1],layerParameters[i][2],layerParameters[i][3],
 						(FeatureMapLayer) outputLayer, null, addBias, useOpenCL);
+				newConvLayer.setPadding(padding);
+				newLayer = newConvLayer;
 			} else if (layerParameters[i].length == 1) { //fully connected layer
 				newLayer = new FullyConnectedLayer(layerParameters[i][0], outputLayer, null, addBias, useOpenCL);
 			} else if (layerParameters[i].length == 2) { //pooling layer

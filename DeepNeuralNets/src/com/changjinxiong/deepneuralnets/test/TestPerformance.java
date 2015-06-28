@@ -47,8 +47,9 @@ public class TestPerformance {
 				};
 		boolean addBias = true;
 		boolean useOpenCL = true;
+		boolean padding = false;
 		int batchSize = 32;
-		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
@@ -72,6 +73,7 @@ public class TestPerformance {
 	@Test
 	public void testCNNTiming1() {
 		boolean useOpenCL = true;
+		boolean padding = false;
 		boolean addBias = true;
 		int batchSize = 6000;
 		MnistDataProvider trainingSet = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
@@ -84,7 +86,7 @@ public class TestPerformance {
 		float lrChangeRate = 0.33f;
 		int epoch = 1;
 		int[][] cnnLayers = new int[][] {{1, 0, 0 ,0}, {20, 5, 5, 1},{2, 2}, {50, 5, 5, 1},{2, 2}, {500}, {10}};
-		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, useOpenCL); 
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
 		cnn.setInputShape(new int[] {28, 28});
 		Layer l1 = cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();

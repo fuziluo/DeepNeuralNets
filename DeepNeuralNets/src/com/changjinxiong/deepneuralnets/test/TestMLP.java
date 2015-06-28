@@ -183,7 +183,7 @@ public class TestMLP {
 	
 	@Test
 	public void gradientCheck() {
-		boolean useOpenCL = false;
+		boolean useOpenCL = true;
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{784,300,10}, true, useOpenCL);
 		Layer l3 = mlp.getOutputLayer();
 		int costType = 1;

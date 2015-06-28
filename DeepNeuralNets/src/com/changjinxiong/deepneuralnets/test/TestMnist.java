@@ -221,10 +221,11 @@ public class TestMnist {
 	public void trainCNN() {
 		boolean useOpenCL = true;
 		boolean addBias = true;
+		boolean padding = false;
 		int batchSize = 20;
 		MnistDataProvider trainingSet = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
 		MnistDataProvider testSet = new MnistDataProvider("test/t10k-images-idx3-ubyte", "test/t10k-labels-idx1-ubyte", batchSize, false);
-		int costType = 1; //cross entropy
+		int costType = 1; //MSE
 		float baselearningRate = 0.005f;
 		float momentum = 0.9f;
 		float weightDecay = 0.001f;
@@ -233,7 +234,7 @@ public class TestMnist {
 		int epoch = 5;
 		int[][] cnnLayers = new int[][] {{1, 0, 0 ,0}, {20, 5, 5, 1},{2, 2}, {50, 5, 5, 1},{2, 2}, {500}, {10}};
 		String path = "/home/jxchang/project/records/mnist/.cnn.weights";
-		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, useOpenCL); 
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
 		cnn.setInputShape(new int[] {28, 28});
 		Layer l1 = cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
@@ -255,14 +256,15 @@ public class TestMnist {
 
 		logger.log(Level.INFO, "Traning configuration: \n"
 				+ "useOpenCL = {0} \n"
-				+ "batchSize = {1} \n"
-				+ "costType = {2} \n"
-				+ "epoch = {3} \n"
-				+ "baselearningRate = {4} \n"
-				+ "momentum = {5} \n"
-				+ "weightDecay = {6} \n"
-				+ "lrChangeCycle = {7} \n"
-				+ "lrChangeRate = {8} \n", new Object[] {useOpenCL, batchSize, (costType==0?"CE":"MSE"), epoch, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate});
+				+ "padding = {1} \n"
+				+ "batchSize = {2} \n"
+				+ "costType = {3} \n"
+				+ "epoch = {4} \n"
+				+ "baselearningRate = {5} \n"
+				+ "momentum = {6} \n"
+				+ "weightDecay = {7} \n"
+				+ "lrChangeCycle = {8} \n"
+				+ "lrChangeRate = {9} \n", new Object[] {useOpenCL, padding,  batchSize, (costType==0?"CE":"MSE"), epoch, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate});
 
 		
 		logger.log(Level.INFO, "Pretest before training...");

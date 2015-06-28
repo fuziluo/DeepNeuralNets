@@ -59,22 +59,28 @@ public class PoolingLayer implements FeatureMapLayer {
 	}
 	
 	@Override
-	protected void finalize() {
-		LOGGER.log(Level.FINEST, "***releasing all cl resources***");
-		if (useOpenCL) {
-			if (activationsCL != null) {
-				clReleaseMemObject(activationsCL);
-				//System.out.println("R activationsCL " + activationsCL);
-				activationsCL = null;
+	protected void finalize() throws Throwable {
+		try {
+			LOGGER.log(Level.FINEST, "***releasing all cl resources***");
+			if (useOpenCL) {
+				if (activationsCL != null) {
+					clReleaseMemObject(activationsCL);
+					//System.out.println("R activationsCL " + activationsCL);
+					activationsCL = null;
+				}
+				if (prevErrorsCL != null) {
+					clReleaseMemObject(prevErrorsCL);
+					//System.out.println("R prevErrorsCL " + prevErrorsCL);
+					prevErrorsCL = null;
+				}
+		        clReleaseKernel(kernel0);
+		        clReleaseKernel(kernel1);
 			}
-			if (prevErrorsCL != null) {
-				clReleaseMemObject(prevErrorsCL);
-				//System.out.println("R prevErrorsCL " + prevErrorsCL);
-				prevErrorsCL = null;
-			}
-	        clReleaseKernel(kernel0);
-	        clReleaseKernel(kernel1);
-		}
+		}catch(Throwable t){
+	        throw t;
+	    }finally{
+	        super.finalize();
+	    }
 	}	
 	
 	public void setPoolingType(PoolingType poolingType) {
@@ -131,6 +137,8 @@ public class PoolingLayer implements FeatureMapLayer {
 		clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
 		clFinish(commandQueue);
 		clReleaseMemObject(arg0);		
+		clReleaseMemObject(activationsCL);	
+		activationsCL = null;
 	}
 
 	private void backPropNoAcc() {
@@ -408,6 +416,21 @@ public class PoolingLayer implements FeatureMapLayer {
 	@Override
 	public ActivationType getActivationType() {
 		return previousLayer.getActivationType();
+	}
+	@Override
+	public void releaseCLMem() {
+		if (useOpenCL) {
+			if (activationsCL != null) {
+				clReleaseMemObject(activationsCL);
+				activationsCL = null;
+			}
+//			if (prevErrorsCL != null) {
+//				clReleaseMemObject(prevErrorsCL);
+//				prevErrorsCL = null;
+//			}
+		}
+//        clReleaseKernel(kernel0);
+//        clReleaseKernel(kernel1);
 	}
 
 }

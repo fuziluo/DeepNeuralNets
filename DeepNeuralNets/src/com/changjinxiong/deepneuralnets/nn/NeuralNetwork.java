@@ -28,4 +28,7 @@ public interface NeuralNetwork {
 	
 	public void loadWeights(String path);
 	
+	public void releaseCLMem();
+
+	
 }

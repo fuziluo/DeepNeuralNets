@@ -23,8 +23,9 @@ public class TestPooling {
 		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = false;
+		boolean padding = true;
 		int batchSize = 100;
-		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
@@ -75,8 +76,9 @@ public class TestPooling {
 		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = true;
+		boolean padding = true;
 		int batchSize = 1;
-		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, useOpenCL);
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();

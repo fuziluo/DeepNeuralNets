@@ -86,39 +86,44 @@ public class FullyConnectedLayer implements Layer{
 
 	}
 	@Override
-	protected void finalize() {
-		LOGGER.log(Level.FINEST, "***releasing all cl resources***");
-		if (useOpenCL) {
-			if (weightsCL != null) {
-				clReleaseMemObject(weightsCL);
-				//System.out.println("R  weightsCL " + weightsCL);
-				weightsCL = null;
+	protected void finalize() throws Throwable {
+		try{
+			LOGGER.log(Level.FINEST, "***releasing all cl resources***");
+			if (useOpenCL) {
+				if (weightsCL != null) {
+					clReleaseMemObject(weightsCL);
+					//System.out.println("R  weightsCL " + weightsCL);
+					weightsCL = null;
+				}
+				if (weightsUpdateCL != null) {
+					clReleaseMemObject(weightsUpdateCL);
+					//System.out.println("R weightsUpdateCL " + weightsUpdateCL);
+					weightsUpdateCL = null;
+				}
+				if (gradientsCL != null) {
+					clReleaseMemObject(gradientsCL);
+					//System.out.println("R gradientsCL " + gradientsCL);
+					gradientsCL = null;
+				}
+				if (activationsCL != null) {
+					clReleaseMemObject(activationsCL);
+					//System.out.println("R activationsCL " + activationsCL);
+					activationsCL = null;
+				}
+				if (prevErrorsCL != null) {
+					clReleaseMemObject(prevErrorsCL);
+					//System.out.println("R prevErrorsCL " + prevErrorsCL);
+					prevErrorsCL = null;
+				}
+		        clReleaseKernel(kernel0);
+		        clReleaseKernel(kernel2);
+		        clReleaseKernel(kernel1);
+		        clReleaseKernel(kernel3);
 			}
-			if (weightsUpdateCL != null) {
-				clReleaseMemObject(weightsUpdateCL);
-				//System.out.println("R weightsUpdateCL " + weightsUpdateCL);
-				weightsUpdateCL = null;
-			}
-			if (gradientsCL != null) {
-				clReleaseMemObject(gradientsCL);
-				//System.out.println("R gradientsCL " + gradientsCL);
-				gradientsCL = null;
-			}
-			if (activationsCL != null) {
-				clReleaseMemObject(activationsCL);
-				//System.out.println("R activationsCL " + activationsCL);
-				activationsCL = null;
-			}
-			if (prevErrorsCL != null) {
-				clReleaseMemObject(prevErrorsCL);
-				//System.out.println("R prevErrorsCL " + prevErrorsCL);
-				prevErrorsCL = null;
-			}
-	        clReleaseKernel(kernel0);
-	        clReleaseKernel(kernel2);
-	        clReleaseKernel(kernel1);
-	        clReleaseKernel(kernel3);
-
+		}catch(Throwable t){
+		    throw t;
+		}finally{
+		    super.finalize();
 		}
 	}
 
@@ -479,11 +484,9 @@ public class FullyConnectedLayer implements Layer{
 //		System.out.println("clEnqueueReadBuffer "+(t6 - t5));
 		
 		//clean up
-		if (nextLayer == null) {
-			clReleaseMemObject(activationsCL);
-			//System.out.println("R activationsCL " + activationsCL);
-			activationsCL = null;
-		}
+		clReleaseMemObject(activationsCL);
+		//System.out.println("R activationsCL " + activationsCL);
+		activationsCL = null;
 	
 		if (previousLayer.getPreviousLayer() != null) {
 			/**************************************
@@ -643,6 +646,38 @@ public class FullyConnectedLayer implements Layer{
 	@Override
 	public ActivationType getActivationType() {
 		return activationType;
+	}
+	@Override
+	public void releaseCLMem() {
+		if (useOpenCL) {
+//			if (weightsCL != null) {
+//				clReleaseMemObject(weightsCL);
+//				weightsCL = null;
+//			}
+//			if (weightsUpdateCL != null) {
+//				clReleaseMemObject(weightsUpdateCL);
+//				weightsUpdateCL = null;
+//			}
+//			if (gradientsCL != null) {
+//				clReleaseMemObject(gradientsCL);
+//				gradientsCL = null;
+//			}
+			if (activationsCL != null) {
+				clReleaseMemObject(activationsCL);
+				activationsCL = null;
+			}
+//			if (prevErrorsCL != null) {
+//				clReleaseMemObject(prevErrorsCL);
+//				prevErrorsCL = null;
+//			}
+//			if (previousLayer != null) {
+//		        clReleaseKernel(kernel0);
+//		        clReleaseKernel(kernel1);
+//		        clReleaseKernel(kernel2);
+//		        clReleaseKernel(kernel3);
+//			}
+		}
+
 	}
 
 }

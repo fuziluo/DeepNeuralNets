@@ -200,6 +200,9 @@ public final class OpenCL {
 				fileContent = "#define addBias " + para[10] + "\n" + fileContent;
 				fileContent = "#define activationType " + para[11] + "\n" + fileContent;
 				fileContent = "#define prevActivationType " + para[12] + "\n" + fileContent;
+				if (para[13] == 1) {
+					fileContent = "#define padding " + 1 + "\n" + fileContent;
+				}
 //				System.out.println(fileContent);
 			}
 			if (layerType == LayerType.POOL) {
@@ -286,10 +289,9 @@ public final class OpenCL {
 			
 		} else if (layerType == LayerType.CONV) {
 			groupSize = new int[] {
-								16,16,60,
-								64, 1, 60,
-								8, 8, 60,
-//								size, size, size		
+								8, 8, 4,
+								4, 8, 8,
+								8, 8, 4,
 								};
 		}
 

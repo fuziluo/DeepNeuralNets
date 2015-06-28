@@ -55,7 +55,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			currentLayer = currentLayer.getNextLayer();
 			long t = System.currentTimeMillis();
 			currentLayer.forwardPass();
-			System.out.printf("  forward %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
+//			System.out.printf("  forward %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
 		}
 	}
 	/* (non-Javadoc)
@@ -73,6 +73,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 //			System.out.printf("  back %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
 			currentLayer = currentLayer.getPreviousLayer();
 		}		
+		currentLayer.releaseCLMem();
 	}
 	
 	@Override
@@ -221,6 +222,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		float errorRate = count/testNum;
 		LOGGER.log(Level.INFO, "{0} out of {1} wrong. Error rate is {2}\n", new Object[] {count, testNum, errorRate} );
 //		System.out.printf("%.0f out of %d wrong. Error rate is %.2f\n", count, testNum, errorRate);
+		releaseCLMem();
 		return errorRate;
 	}
 	/* (non-Javadoc)
@@ -281,6 +283,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			updateWeights(baseLr, momentum, weightDecay);	
 
 		}
+		releaseCLMem();
 		LOGGER.log(Level.INFO, "Training finished");
 	}
 	/* (non-Javadoc)
@@ -443,6 +446,14 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			e.printStackTrace();
 		}
 
+	}
+	@Override
+	public void releaseCLMem() {
+		Layer currentLayer = inputLayer;
+		while (currentLayer != null) {
+			currentLayer.releaseCLMem();
+			currentLayer = currentLayer.getNextLayer();
+		}
 	}
 
 }

@@ -30,4 +30,5 @@ public interface Layer {
 	public cl_mem getPrevErrorsCL();
 	public void setActivationType(ActivationType type);
 	public ActivationType getActivationType();
+	public void releaseCLMem();
 }
