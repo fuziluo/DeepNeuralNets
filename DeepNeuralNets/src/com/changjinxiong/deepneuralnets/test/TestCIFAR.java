@@ -24,6 +24,8 @@ import com.changjinxiong.deepneuralnets.nn.ConvolutionalNeuralNetwork;
 import com.changjinxiong.deepneuralnets.nn.Layer;
 import com.changjinxiong.deepneuralnets.nn.MultiLayerPerceptron;
 import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
+import com.changjinxiong.deepneuralnets.nn.PoolingLayer;
+import com.changjinxiong.deepneuralnets.nn.PoolingLayer.PoolingType;
 import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 import com.changjinxiong.deepneuralnets.test.CIFAR10DataProvider.DatasetType;
 
@@ -158,19 +160,19 @@ public class TestCIFAR {
 		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
 		CIFAR10DataProvider TestSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TEST, false);
 		int costType = 1; 
-		float baselearningRate = 0;//0.003f;
+		float baselearningRate = 0.003f;
 		float momentum = 0.9f;
-		float weightDecay = 0.005f;
+		float weightDecay = 0;//0.01f;
 		int lrChangeCycle = 5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
 		float lrChangeRate = 0.33f;
-		int epoch = 5;
+		int epoch = 10;
 		int[][] cnnLayers = new int[][] {	{3, 0, 0 ,0}, 
 											{32, 5, 5, 1},
-											{2, 2}, 
+											{2, 2, 2}, 
 											{32, 5, 5, 1},
-											{2, 2}, 
+											{2, 2, 2}, 
 											{64, 5, 5, 1}, 
-											{2, 2}, 
+											{2, 2, 2}, 
 											{64},
 											{10}
 											};
@@ -178,11 +180,11 @@ public class TestCIFAR {
 		cnn.setInputShape(new int[] {32, 32});
 		Layer l1 = cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
-		Layer l3 = l2.getNextLayer();
+		PoolingLayer l3 = (PoolingLayer) l2.getNextLayer();
 		Layer l4 = l3.getNextLayer();
-		Layer l5 = l4.getNextLayer();
+		PoolingLayer l5 = (PoolingLayer) l4.getNextLayer();
 		Layer l6 = l5.getNextLayer();
-		Layer l7 = l6.getNextLayer();
+		PoolingLayer l7 = (PoolingLayer) l6.getNextLayer();
 		Layer l8 = l7.getNextLayer();
 		Layer l9 = l8.getNextLayer();
 		l2.setActivationType(ActivationType.TANH);
@@ -190,6 +192,9 @@ public class TestCIFAR {
 		l6.setActivationType(ActivationType.TANH);
 		l8.setActivationType(ActivationType.TANH);
 		l9.setActivationType(ActivationType.TANH);
+		l3.setPoolingType(PoolingType.MAX);
+		l5.setPoolingType(PoolingType.AVER);
+		l7.setPoolingType(PoolingType.AVER);
 		
 		Logger logger = Logger.getLogger("CIFAR10 traing with CNN");
 		logger.log(Level.INFO, "CNN architecture: \n"

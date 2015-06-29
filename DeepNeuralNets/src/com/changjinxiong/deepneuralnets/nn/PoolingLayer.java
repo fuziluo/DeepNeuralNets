@@ -33,6 +33,7 @@ public class PoolingLayer implements FeatureMapLayer {
 	private PoolingType poolingType;
 	private final int poolHeight;
 	private final int poolWidth;
+	private final int stride;	
 	private int batchSize; //batch size could change in different calculation
 	private cl_kernel kernel0, kernel1;
 	private float[] activations;
@@ -42,7 +43,7 @@ public class PoolingLayer implements FeatureMapLayer {
 	private cl_mem prevErrorsCL;
 	private long[] localWorkSizeK0, localWorkSizeK1;	
 	
-	public PoolingLayer(int poolHeight, int poolWidth, FeatureMapLayer previousLayer, Layer nextLayer, boolean useOpenCL) {
+	public PoolingLayer(int poolHeight, int poolWidth, int stride, FeatureMapLayer previousLayer, Layer nextLayer, boolean useOpenCL) {
 		if (previousLayer == null) {
 			throw new IllegalArgumentException("pooling layer cannot be input layer");
 		}
@@ -56,6 +57,7 @@ public class PoolingLayer implements FeatureMapLayer {
 		}
 		this.poolHeight = poolHeight;
 		this.poolWidth = poolWidth;
+		this.stride = stride;
 	}
 	
 	@Override
@@ -128,6 +130,7 @@ public class PoolingLayer implements FeatureMapLayer {
 		cl_mem arg0 = nextLayer.getPrevErrorsCL();
 		cl_mem arg1 = previousLayer.getActivationsCL();
 		prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, prevErrors.length* Sizeof.cl_float, null, null);
+		clEnqueueFillBuffer(commandQueue, prevErrorsCL, Pointer.to(new float[] {0}), 1, 0, prevErrors.length* Sizeof.cl_float, 0, null, null );
 		cl_mem arg2 = prevErrorsCL;
 		clSetKernelArg(kernel1, 0, Sizeof.cl_mem, Pointer.to(arg0));
 		clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg1));
@@ -150,10 +153,10 @@ public class PoolingLayer implements FeatureMapLayer {
 			for (int j = 0; j < numOfFeatureMaps; j++) {
 				int inputFeatureMapsOffset = inputBatchOffset +  j * inputFeatureMapsShape[0] * inputFeatureMapsShape[1];
 				int outputFeatureMapsOffset = outputBatchOffest + j * outputFeatureMapsShape[0] * outputFeatureMapsShape[1];
-				for (int rin = 0; rin <= inputFeatureMapsShape[0] - poolHeight; rin += poolHeight) { //ignoring border
-					for (int cin = 0; cin <= inputFeatureMapsShape[1] - poolWidth; cin += poolWidth) {
-						int rout = rin / poolHeight;
-						int cout = cin / poolWidth;
+				for (int rin = 0; rin <= inputFeatureMapsShape[0] - 1; rin += stride) { //not ignoring border
+					for (int cin = 0; cin <= inputFeatureMapsShape[1] - 1; cin += stride) {
+						int rout = rin / stride;
+						int cout = cin / stride;
 						poolingBackFunc(preAct, prevErrors, errors[outputFeatureMapsOffset + rout * outputFeatureMapsShape[1] + cout], 
 								inputFeatureMapsOffset, rin, cin);
 					}
@@ -166,17 +169,26 @@ public class PoolingLayer implements FeatureMapLayer {
 			int offset, int rin, int cin) {
 		switch (poolingType) {
 		case AVER:
-			for (int i = rin; i < rin + poolHeight; i++) {
-				for (int j = cin; j < cin + poolWidth; j++) {
-					prevErrors[offset + i * inputFeatureMapsShape[1] + j] = error / (poolHeight * poolWidth);
+			float err = 0;
+			int cnt = 0;
+			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
+				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
+					err += error;
+					cnt ++;
 				}				
-			}	
+			}
+			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
+				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
+					prevErrors[offset + i * inputFeatureMapsShape[1] + j] += err /cnt;
+				}
+			}
+
 			break;
 		case MAX:
 			float act = preAct[offset + rin * inputFeatureMapsShape[1] + cin];
 			int rMax = rin, cMax = cin;
-			for (int i = rin; i < rin + poolHeight; i++) {
-				for (int j = cin; j < cin + poolWidth; j++) {
+			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
+				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
 					if (act < preAct[offset + i * inputFeatureMapsShape[1] + j]) {
 						act = preAct[offset + i * inputFeatureMapsShape[1] + j];
 						rMax = i;
@@ -184,7 +196,7 @@ public class PoolingLayer implements FeatureMapLayer {
 					}
 				}				
 			}
-			prevErrors[offset + rMax * inputFeatureMapsShape[1] + cMax] = error;
+			prevErrors[offset + rMax * inputFeatureMapsShape[1] + cMax] += error;
 			break;
 		default:
 			break;
@@ -235,10 +247,10 @@ public class PoolingLayer implements FeatureMapLayer {
 			for (int j = 0; j < numOfFeatureMaps; j++) {
 				int inputFeatureMapsOffset = inputBatchOffset +  j * inputFeatureMapsShape[0] * inputFeatureMapsShape[1];
 				int outputFeatureMapsOffset = outputBatchOffest + j * outputFeatureMapsShape[0] * outputFeatureMapsShape[1];
-				for (int rin = 0; rin <= inputFeatureMapsShape[0] - poolHeight; rin += poolHeight) { //ignoring border
-					for (int cin = 0; cin <= inputFeatureMapsShape[1] - poolWidth; cin += poolWidth) {
-						int rout = rin / poolHeight;
-						int cout = cin / poolWidth;
+				for (int rin = 0; rin <= inputFeatureMapsShape[0] - 1; rin += stride) { //not ignoring border
+					for (int cin = 0; cin <= inputFeatureMapsShape[1] - 1; cin += stride) {
+						int rout = rin / stride;
+						int cout = cin / stride;
 						activations[outputFeatureMapsOffset + rout * outputFeatureMapsShape[1] + cout] = 
 								poolingFunc(preAct, inputFeatureMapsOffset, rin, cin);
 					}
@@ -251,17 +263,19 @@ public class PoolingLayer implements FeatureMapLayer {
 		float out = 0;
 		switch (poolingType) {
 		case AVER:
-			for (int i = rin; i < rin + poolHeight; i++) {
-				for (int j = cin; j < cin + poolWidth; j++) {
+			int cnt = 0;
+			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
+				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
 					out += preAct[offset + i * inputFeatureMapsShape[1] + j];
+					cnt++;
 				}				
 			}	
-			out /= poolHeight * poolWidth;
+			out /= cnt;
 			break;
 		case MAX:
 			out = preAct[offset + rin * inputFeatureMapsShape[1] + cin];
-			for (int i = rin; i < rin + poolHeight; i++) {
-				for (int j = cin; j < cin + poolWidth; j++) {
+			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
+				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
 					out = Math.max(out, preAct[offset + i * inputFeatureMapsShape[1] + j]);
 				}				
 			}
@@ -363,8 +377,17 @@ public class PoolingLayer implements FeatureMapLayer {
 			inputFeatureMapsShape = newShape;
 		
 			//calculating output feature map size from input feature map size
-			int h = inputFeatureMapsShape[0] / poolHeight;
-			int w = inputFeatureMapsShape[1] / poolWidth;
+			int h = 0, w = 0;
+			if (inputFeatureMapsShape[0] > poolHeight && inputFeatureMapsShape[1] > poolWidth) {
+				if (true) {//FIXME
+					h = (inputFeatureMapsShape[0] - 1) / stride + 1;
+					w = (inputFeatureMapsShape[1] - 1) / stride + 1;
+
+				} else {
+					h = (inputFeatureMapsShape[0] - poolHeight) / stride + 1;
+					w = (inputFeatureMapsShape[1] - poolWidth) / stride + 1;
+				}
+			}			
 			outputFeatureMapsShape = new int[] {h, w};
 			if (useOpenCL) {
 				generateKernels();
@@ -383,7 +406,7 @@ public class PoolingLayer implements FeatureMapLayer {
 		int[] para = {
 				poolingType.getValue(), PoolingType.AVER.getValue(), PoolingType.MAX.getValue(), 
 				numOfFeatureMaps, inputFeatureMapsShape[0], inputFeatureMapsShape[1], outputFeatureMapsShape[0], outputFeatureMapsShape[1],
-				poolHeight, poolWidth, batchSize
+				poolHeight, poolWidth, stride, batchSize
 		}; 
 		cl_program program = OpenCL.getProgram(LayerType.POOL, null, para);
 		//kernel for forward pass

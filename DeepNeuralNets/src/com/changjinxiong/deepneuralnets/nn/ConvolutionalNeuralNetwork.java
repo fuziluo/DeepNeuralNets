@@ -26,11 +26,11 @@ public class ConvolutionalNeuralNetwork extends NeuralNetworkBase {
 				newLayer = newConvLayer;
 			} else if (layerParameters[i].length == 1) { //fully connected layer
 				newLayer = new FullyConnectedLayer(layerParameters[i][0], outputLayer, null, addBias, useOpenCL);
-			} else if (layerParameters[i].length == 2) { //pooling layer
+			} else if (layerParameters[i].length == 3) { //pooling layer
 				if (!(outputLayer instanceof FeatureMapLayer)) {
 					throw new IllegalArgumentException("Pooling layer must be connected to a FeatureMap layer");
 				}
-				newLayer = new PoolingLayer(layerParameters[i][0], layerParameters[i][1],
+				newLayer = new PoolingLayer(layerParameters[i][0], layerParameters[i][1], layerParameters[i][2],
 						(FeatureMapLayer) outputLayer, null, useOpenCL);
 			} else { 
 				throw new IllegalArgumentException("The parameter of layer "+ i +" is wrong");

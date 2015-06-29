@@ -20,7 +20,7 @@ public class TestPooling {
 	@Test
 	public void testBackpropagation() {
 //		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2}, {10}};
-		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2}, {10}};
+		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2, 1}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = false;
 		boolean padding = true;
@@ -49,7 +49,7 @@ public class TestPooling {
 //		System.out.println(Arrays.toString(l4.getPrevErrors()));
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.005f;
+		double e = 0.002f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.fordwardPass(tin);
@@ -73,11 +73,11 @@ public class TestPooling {
 	@Test
 	public void testBackpropagationCL() {
 //		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2}, {10}};
-		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2}, {10}};
+		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2, 1}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = true;
 		boolean padding = true;
-		int batchSize = 1;
+		int batchSize = 100;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
@@ -102,7 +102,7 @@ public class TestPooling {
 //		System.out.println(Arrays.toString(l4.getPrevErrors()));
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.00125f;
+		double e = 0.002f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.fordwardPass(tin);
@@ -130,8 +130,9 @@ public class TestPooling {
 		int numOfFeatureMaps = 2;
 		int poolHeight = 2;
 		int poolWidth = 2;
+		int stride = 2;
 		FeatureMapLayer inputLayer = new ConvolutionalLayer(numOfFeatureMaps, 0, 0, 0, null, null, addBias, useOpenCL);
-		FeatureMapLayer poolingLayer = new PoolingLayer(poolHeight, poolWidth, inputLayer, null, useOpenCL);
+		FeatureMapLayer poolingLayer = new PoolingLayer(poolHeight, poolWidth, stride, inputLayer, null, useOpenCL);
 		inputLayer.setNextLayer(poolingLayer);
 //		Layer outLayer = new FullyConnectedLayer(10, poolingLayer, null, false, useOpenCL);
 		//test max pooling
@@ -205,11 +206,13 @@ public class TestPooling {
 				1, 2, 3, 8, 5,
 		};
 		float[] outputs1 = {
-				9, 4,
-				2, 4,
+				9, 4, 5,
+				2, 4, 5,
+				2, 8, 5,
 
-				9, 4,
-				2, 4,
+				9, 4, 5,
+				2, 4, 5,
+				2, 8, 5,
 		};
 		inputLayer.setInputShape(inputShape1);
 		inputLayer.setInputs(inputs1);
@@ -219,6 +222,62 @@ public class TestPooling {
 		System.out.println(Arrays.toString(results));
 		assertArrayEquals("!!",outputs1,results1, 0);		
 	}
+	
+	@Test
+	public void testForwardPassStride() {
+		boolean addBias = false;
+		boolean useOpenCL = true;
+		int numOfFeatureMaps = 2;
+		int poolHeight = 2;
+		int poolWidth = 2;
+		int stride = 1;
+		FeatureMapLayer inputLayer = new ConvolutionalLayer(numOfFeatureMaps, 0, 0, 0, null, null, addBias, useOpenCL);
+		FeatureMapLayer poolingLayer = new PoolingLayer(poolHeight, poolWidth, stride, inputLayer, null, useOpenCL);
+		inputLayer.setNextLayer(poolingLayer);
+//		Layer outLayer = new FullyConnectedLayer(10, poolingLayer, null, false, useOpenCL);
+		//test max pooling
+		int[] inputShape = {6, 6};
+		float[] inputs = {
+				1, 2, 3, 4, 5, 1,
+				1, 9, 3, 4, 3, 2,
+				1, 2, 3, 4, 5, 1,
+				1, 2, 3, 4, 5, 2,
+				1, 2, 3, 8, 5, 1,
+				1, 2, 3, 4, 5, 2,
+
+				1, 2, 3, 4, 5, 1,
+				1, 9, 3, 4, 3, 2,
+				1, 2, 3, 4, 5, 1,
+				1, 2, 3, 4, 5, 2,
+				1, 2, 3, 8, 5, 1,
+				1, 2, 3, 4, 5, 2,				
+
+		};
+		float[] outputs = {
+				9, 9, 4, 5, 5, 2,
+				9, 9, 4, 5, 5, 2,
+				2, 3, 4, 5, 5, 2,
+				2, 3, 8, 8, 5, 2,
+				2, 3, 8, 8, 5, 2,
+				2, 3, 4, 5, 5, 2,
+
+				9, 9, 4, 5, 5, 2,
+				9, 9, 4, 5, 5, 2,
+				2, 3, 4, 5, 5, 2,
+				2, 3, 8, 8, 5, 2,
+				2, 3, 8, 8, 5, 2,
+				2, 3, 4, 5, 5, 2
+
+		};
+		inputLayer.setInputShape(inputShape);
+		inputLayer.setInputs(inputs);
+		
+		poolingLayer.forwardPass();
+		float[] results = poolingLayer.getActivations();
+		System.out.println(Arrays.toString(results));
+		assertArrayEquals("!!",outputs,results, 0);
+
+	}
 	@Test
 	public void testForwardPassAverPooling() {
 		boolean addBias = false;
@@ -226,8 +285,9 @@ public class TestPooling {
 		int numOfFeatureMaps = 2;
 		int poolHeight = 2;
 		int poolWidth = 2;
+		int stride = 2;
 		FeatureMapLayer inputLayer = new ConvolutionalLayer(numOfFeatureMaps, 0, 0, 0, null, null, addBias, useOpenCL);
-		PoolingLayer poolingLayer = new PoolingLayer(poolHeight, poolWidth, inputLayer, null, useOpenCL);
+		PoolingLayer poolingLayer = new PoolingLayer(poolHeight, poolWidth, stride, inputLayer, null, useOpenCL);
 		poolingLayer.setPoolingType(PoolingType.AVER);
 		inputLayer.setNextLayer(poolingLayer);
 //		Layer outLayer = new FullyConnectedLayer(10, poolingLayer, null, false, useOpenCL);
@@ -292,17 +352,21 @@ public class TestPooling {
 				1, 2, 3, 8, 5,
 		};
 		float[] outputs1 = {
-				3.25f, 3.5f,
-				1.5f, 3.5f, 
+				3.25f, 3.5f, 4f,
+				1.5f, 3.5f, 5f,
+				1.5f, 5.5f, 5f,
 
-				3.25f, 3.5f,
-				1.5f, 3.5f, 
+				3.25f, 3.5f, 4f,
+				1.5f, 3.5f, 5f,
+				1.5f, 5.5f, 5f,
 
-				3.25f, 3.5f,
-				1.5f, 3.5f, 
+				3.25f, 3.5f, 4f,
+				1.5f, 3.5f, 5f,
+				1.5f, 5.5f, 5f,
 
-				3.25f, 3.5f,
-				1.5f, 3.5f, 
+				3.25f, 3.5f, 4f,
+				1.5f, 3.5f, 5f,
+				1.5f, 5.5f, 5f,
 		};
 		inputLayer.setInputShape(inputShape1);
 		inputLayer.setInputs(inputs1);
@@ -321,8 +385,9 @@ public class TestPooling {
 		int numOfFeatureMaps = 2;
 		int poolHeight = 2;
 		int poolWidth = 2;
+		int stride = 2;
 		FeatureMapLayer inputLayer = new ConvolutionalLayer(numOfFeatureMaps, 0, 0, 0, null, null, addBias, useOpenCL);
-		FeatureMapLayer poolingLayer = new PoolingLayer(poolHeight, poolWidth, inputLayer, null, useOpenCL);
+		FeatureMapLayer poolingLayer = new PoolingLayer(poolHeight, poolWidth, stride, inputLayer, null, useOpenCL);
 		inputLayer.setNextLayer(poolingLayer);
 	//	Layer outLayer = new FullyConnectedLayer(10, poolingLayer, null, false, useOpenCL);
 		//test max pooling
@@ -396,11 +461,13 @@ public class TestPooling {
 				1, 2, 3, 8, 5,
 		};
 		float[] outputs1 = {
-				9, 4,
-				2, 4,
+				9, 4, 5,
+				2, 4, 5,
+				2, 8, 5,
 	
-				9, 4,
-				2, 4,
+				9, 4, 5,
+				2, 4, 5,
+				2, 8, 5,
 		};
 		inputLayer.setInputShape(inputShape1);
 		inputLayer.setInputs(inputs1);
@@ -417,8 +484,9 @@ public class TestPooling {
 		int numOfFeatureMaps = 2;
 		int poolHeight = 2;
 		int poolWidth = 2;
+		int stride = 2;
 		FeatureMapLayer inputLayer = new ConvolutionalLayer(numOfFeatureMaps, 0, 0, 0, null, null, addBias, useOpenCL);
-		PoolingLayer poolingLayer = new PoolingLayer(poolHeight, poolWidth, inputLayer, null, useOpenCL);
+		PoolingLayer poolingLayer = new PoolingLayer(poolHeight, poolWidth, stride, inputLayer, null, useOpenCL);
 		poolingLayer.setPoolingType(PoolingType.AVER);
 		inputLayer.setNextLayer(poolingLayer);
 	//	Layer outLayer = new FullyConnectedLayer(10, poolingLayer, null, false, useOpenCL);
@@ -483,17 +551,22 @@ public class TestPooling {
 				1, 2, 3, 8, 5,
 		};
 		float[] outputs1 = {
-				3.25f, 3.5f,
-				1.5f, 3.5f, 
+				3.25f, 3.5f, 4f,
+				1.5f, 3.5f, 5f,
+				1.5f, 5.5f, 5f,
 	
-				3.25f, 3.5f,
-				1.5f, 3.5f, 
+				3.25f, 3.5f, 4f,
+				1.5f, 3.5f, 5f,
+				1.5f, 5.5f, 5f,
 	
-				3.25f, 3.5f,
-				1.5f, 3.5f, 
+				3.25f, 3.5f, 4f,
+				1.5f, 3.5f, 5f,
+				1.5f, 5.5f, 5f,
 	
-				3.25f, 3.5f,
-				1.5f, 3.5f, 
+				3.25f, 3.5f, 4f,
+				1.5f, 3.5f, 5f,
+				1.5f, 5.5f, 5f,
+	
 		};
 		inputLayer.setInputShape(inputShape1);
 		inputLayer.setInputs(inputs1);

@@ -266,14 +266,14 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			backPropagation(batchLabels, costType);
 			
 			averageCost += cost;
-			if (k >= dp.getDatasetSize() / dp.getBatchSize()) {
-				averageCost /= k;
-				LOGGER.log(Level.INFO, "Average cost over last {0} batches is {1}", new Object[] {k, averageCost});
+			if (k >= dp.getDatasetSize() / dp.getBatchSize() - 1) {
+				averageCost /= k + 1;
+				LOGGER.log(Level.INFO, "Average cost over last {0} batches is {1}", new Object[] {k + 1, averageCost});
 //				System.out.printf("Average cost over last %d batches is %.5f\n", k, averageCost);
 				k = 0;
 				averageCost = 0;
 			}
-			if (lrChangCycle > 0 && j >= lrChangCycle && lrDecayTimes < lrDecayTimesLimit) {
+			if (lrChangCycle > 0 && j >= lrChangCycle - 1 && lrDecayTimes < lrDecayTimesLimit) {
 				baseLr *= lrChangRate;
 				LOGGER.log(Level.INFO, "learning rate reduced to {0} after {1} batches", new Object[] {baseLr, i});
 //				System.out.printf("learning rate reduced to %f after %d batches\n", baseLr, i);

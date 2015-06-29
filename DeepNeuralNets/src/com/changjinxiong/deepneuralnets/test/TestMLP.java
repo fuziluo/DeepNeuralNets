@@ -14,6 +14,7 @@ import com.changjinxiong.deepneuralnets.nn.FullyConnectedLayer;
 import com.changjinxiong.deepneuralnets.nn.Layer;
 import com.changjinxiong.deepneuralnets.nn.MultiLayerPerceptron;
 import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
+import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 /**
  * 
  * @author jxchang
@@ -42,6 +43,8 @@ public class TestMLP {
 		Layer l1 = mlp.getInputLayer();
 		l3.setWeight(new float[] {0.1f, 0.2f});
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f});
+		l2.setActivationType(ActivationType.SIGMOID);
+		l3.setActivationType(ActivationType.SIGMOID);
 //		mlp.fordwardPass(new float[] {1, 2});
 ////		System.out.println(Arrays.toString(l2.getWeight()));
 //		assertEquals(l2.getActivations()[0], 0.622459, 0.00001);
@@ -60,6 +63,8 @@ public class TestMLP {
 		l1 = mlp.getInputLayer();
 		l3.setWeight(new float[] {0.1f, 0.2f, 0.3f});
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f});
+		l2.setActivationType(ActivationType.SIGMOID);
+		l3.setActivationType(ActivationType.SIGMOID);
 		mlp.fordwardPass(new float[] {1, 2});
 		assertEquals(l2.getActivations()[0], 0.689974, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.880797, 0.00001);
@@ -81,6 +86,8 @@ public class TestMLP {
 
 		l3.setWeight(new float[] {0.1f, 0.2f, 0.3f});
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f});
+		l2.setActivationType(ActivationType.SIGMOID);
+		l3.setActivationType(ActivationType.SIGMOID);
 
 		mlp.fordwardPass(new float[] {1, 2});
 		assertEquals(l2.getActivations()[0], 0.689974, 0.00001);
@@ -102,6 +109,8 @@ public class TestMLP {
 		Layer l3 = mlp.getOutputLayer();
 		Layer l2 = mlp.getOutputLayer().getPreviousLayer();
 		Layer l1 = mlp.getInputLayer();
+		l2.setActivationType(ActivationType.SIGMOID);
+		l3.setActivationType(ActivationType.SIGMOID);
 		
 		//check back propagation 
 		float[] tin = new float[] {	
@@ -128,55 +137,43 @@ public class TestMLP {
 									
 									};
 		mlp.fordwardPass(tin);
+		float[] a1 = l2.getActivations();
+		float[] a11 = l3.getActivations();
+		mlp.backPropagation(tout, 0);
 		float c1 = mlp.getCost(tout, 0);
 		float[] g1 = l2.getGradients();
 		float[] g11 = l3.getGradients();
-		float[] a1 = l2.getActivations();
-		float[] a11 = l3.getActivations();
-		
-		System.out.println("a1 "+Arrays.toString(a1));
-		mlp.backPropagation(tout, 0);
-//		mlp.updateWeights(0.01f);
-//		mlp.fordwardPass(new float[] {1, 2, 1, 3, 1, 1}, false);
-//		mlp.backPropagation(new float[] {1, 0}, false);
-//		mlp.updateWeights(0.01f);
-//		float[] w1 = l2.getWeight();
-		System.out.println("g11 "+Arrays.toString(g11));
-//		System.out.println(Arrays.toString(w1));
+//		float[] e1 = l3.getPrevErrors();
 		
 		
 		useOpenCL = true;
 		NeuralNetwork mlp1 = new MultiLayerPerceptron(new int[]{2,42,2}, addBias, useOpenCL);
-		l3 = mlp1.getOutputLayer();
-		l2 = mlp1.getOutputLayer().getPreviousLayer();
-		l1 = mlp1.getInputLayer();
+		Layer l13 = mlp1.getOutputLayer();
+		Layer l12 = mlp1.getOutputLayer().getPreviousLayer();
+		Layer l11 = mlp1.getInputLayer();
+		l12.setActivationType(ActivationType.SIGMOID);
+		l13.setActivationType(ActivationType.SIGMOID);
 			
 
 		mlp1.fordwardPass(tin);
 		float c2 = mlp1.getCost(tout, 0);
-		float[] g2 = l2.getGradients();
-		float[] g12 = l3.getGradients();
-		float[] a2 = l2.getActivations();
-		float[] a12 = l3.getActivations();
-		System.out.println("a2 "+Arrays.toString(a2));
-		System.out.println("g12 "+Arrays.toString(g12));
+		float[] a2 = l12.getActivations();
+		float[] a12 = l13.getActivations();
 		mlp1.backPropagation(tout, 0);
-//		mlp1.updateWeights(0.01f);
-//		mlp1.fordwardPass(new float[] {1, 2, 1, 3, 1, 1}, true);
-//		mlp1.backPropagation(new float[] {1, 0}, true);
-//		mlp1.updateWeights(0.01f);
 
-//		float[] w2 = l2.getWeight();
-		g12 = l3.getGradients();
-		System.out.println("g12 "+Arrays.toString(g12));
-		System.out.println(l2.getBatchSize());
-//		System.out.println(Arrays.toString(w2));
+		float[] g2 = l12.getGradients();
+		float[] g12 = l13.getGradients();
+//		float[] e2 = l13.getPrevErrors();
+		System.out.println("g1 "+Arrays.toString(g1));
+		System.out.println("g2 "+Arrays.toString(g2));
+//		System.out.println("e1 "+Arrays.toString(e1));
+//		System.out.println("e2 "+Arrays.toString(e2));
 
 		assertArrayEquals("!!",a1,a2, 0.00001f);
 		assertArrayEquals("!!",a11,a12, 0.00001f);
 		assertArrayEquals("!!",g11,g12, 0.00001f);
+//		assertArrayEquals("!!",e1,e2, 0.00001f);
 		assertArrayEquals("!!",g1,g2, 0.00001f);
-//		assertArrayEquals("!!",w1,w2, 0.00001f);
 		assertEquals(c1, c2, 0.0001);
 
 	}

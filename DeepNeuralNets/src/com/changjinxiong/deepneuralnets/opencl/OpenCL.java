@@ -168,7 +168,6 @@ public final class OpenCL {
         try {
 			//TODO
 			fileContent = new String(Files.readAllBytes(Paths.get(path, "opencl", "kernel", kernelSource)));
-//			fileContent = "#define groupSize " + 15 + "\n" + fileContent;
 			fileContent = "#define groupSize_k0_M " + groupSizes[0] + "\n" + fileContent;
 			fileContent = "#define groupSize_k0_N " + groupSizes[1] + "\n" + fileContent;
 			fileContent = "#define groupSize_k0_K " + groupSizes[2] + "\n" + fileContent;
@@ -216,7 +215,8 @@ public final class OpenCL {
 				fileContent = "#define outputFeatureMapsShapeW " + para[7] + "\n" + fileContent;
 				fileContent = "#define poolHeight " + para[8] + "\n" + fileContent;
 				fileContent = "#define poolWidth " + para[9] + "\n" + fileContent;
-				fileContent = "#define batchSize " + para[10] + "\n" + fileContent;
+				fileContent = "#define stride " + para[10] + "\n" + fileContent;
+				fileContent = "#define batchSize " + para[11] + "\n" + fileContent;
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -253,7 +253,7 @@ public final class OpenCL {
 	        commandQueue = null;
 		}
 	}
-	public static int[] getGroupSize(LayerType layerType, int[] kernelDims) {
+	public static int[] getGroupSize(LayerType layerType, int[] para) {
 //		System.out.println(Arrays.toString(kernelDims));              
 		//calculate results for kernel0,
 		//n and k should align with cache line size
@@ -289,10 +289,15 @@ public final class OpenCL {
 			
 		} else if (layerType == LayerType.CONV) {
 			groupSize = new int[] {
-								8, 8, 4,
-								4, 8, 8,
-								8, 8, 4,
+								4, 4, 16,
+								4, 4, 16,
+								4, 4, 16,
 								};
+			groupSize = new int[] {
+					8, 4, 8,
+					4, 8, 8,
+					8, 4, 8,
+					};
 		}
 
 		return groupSize;	
