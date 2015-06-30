@@ -26,10 +26,6 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	protected final static Logger LOGGER = Logger.getLogger(NeuralNetwork.class.getSimpleName()); 
 	protected float cost;
 
-	@Override
-	protected void finalize() {
-		OpenCL.releaseAll();
-	}
 	/* (non-Javadoc)
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#getInputLayer()
 	 */
@@ -48,7 +44,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#fordwardPass(float[], int, boolean)
 	 */
 	@Override
-	public void fordwardPass(float[] inputSamples) {
+	public void forwardPass(float[] inputSamples) {
 		inputLayer.setInputs(inputSamples); //provide input data
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
@@ -65,7 +61,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	public void backPropagation(float[] labels, int costType) {
 		long t = System.currentTimeMillis();
 		setError(labels, costType);
-//		System.out.printf("  calc err %dms \n", (System.currentTimeMillis() - t));
+		System.out.printf("  calc err %dms \n", (System.currentTimeMillis() - t));
 		Layer currentLayer = outputLayer;
 		while (currentLayer.getPreviousLayer() != null) {
 			t = System.currentTimeMillis();
@@ -189,7 +185,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		ArrayList<Float> testResult = new ArrayList<Float>();
 		ArrayList<Float> labels = new ArrayList<Float>();
 		for ( ; testNum < dp.getDatasetSize(); testNum += dp.getBatchSize()) {
-			fordwardPass(dp.getNextbatchInput());
+			forwardPass(dp.getNextbatchInput());
 			for (float a : getOutputLayer().getActivations()) {
 				testResult.add(a);
 			}
@@ -257,7 +253,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		int lrDecayTimesLimit = 1;
 		int lrDecayTimes = 0;
 		for (int i = 0, j = 0, k = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize(), j++, k++) {
-			fordwardPass(dp.getNextbatchInput());
+			forwardPass(dp.getNextbatchInput());
 			//monitor the cost
 			long t = System.currentTimeMillis();
 			float [] batchLabels = dp.getNextBatchLabel();

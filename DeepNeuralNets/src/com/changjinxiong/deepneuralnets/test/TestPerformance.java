@@ -21,15 +21,25 @@ public class TestPerformance {
 
 	@Test
 	public void testMLPForward() {
-		int inputLayerSize = 800000;
-		int outputLayerSize = 8;
-		int batchSize = 128;
+		int inputLayerSize = 13*13;
+		int hiddenLayerSize = 256*13*13;
+		int outputLayerSize = 4096;
+		int batchSize = 256;
 		boolean useOpenCL = true;
-		boolean addBias = false;
-		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{inputLayerSize, outputLayerSize}, addBias, useOpenCL);
-		float[] inputSamples = new float[(inputLayerSize + (addBias ? 1 : 0)) * batchSize];
-		mlp.getInputLayer().setInputs(inputSamples); //provide input data
-		mlp.getOutputLayer().forwardPass();
+		boolean addBias = true;
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{inputLayerSize, hiddenLayerSize, outputLayerSize}, addBias, useOpenCL);
+		float[] inputSamples = new float[inputLayerSize * batchSize];
+		float[] labels = new float[outputLayerSize * batchSize];
+//		mlp.getInputLayer().setInputs(inputSamples); //provide input data
+		mlp.forwardPass(inputSamples);
+		long t = System.currentTimeMillis();
+		mlp.forwardPass(inputSamples);
+		long t1 = System.currentTimeMillis();
+		System.out.println("forward "+(t1 - t));
+		mlp.backPropagation(labels, 1);
+		long t2 = System.currentTimeMillis();
+		System.out.println("back "+(t2 - t1));
+		
 	}
 	
 	@Test
@@ -60,10 +70,10 @@ public class TestPerformance {
 		cnn.setInputShape(new int[] {inputSize, inputSize});		
 		float[] testInput = new float[batchSize * numOfInputFeatureMaps * inputSize * inputSize];
 		float[] testLabel = new float[batchSize * 10];
-		cnn.fordwardPass(testInput);
+		cnn.forwardPass(testInput);
 		System.out.println("**********Timing starting************");
 		long t = System.currentTimeMillis();
-		cnn.fordwardPass(testInput);
+		cnn.forwardPass(testInput);
 		System.out.println("forward "+(System.currentTimeMillis() - t));
 		t = System.currentTimeMillis();
 		cnn.backPropagation(testLabel, 0);
@@ -75,7 +85,7 @@ public class TestPerformance {
 	@Test
 	public void testCNNTiming1() {
 		boolean useOpenCL = true;
-		boolean padding = true;
+		boolean padding = false;
 		boolean addBias = true;
 		int batchSize = 6000;
 		MnistDataProvider trainingSet = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);

@@ -275,9 +275,9 @@ public final class OpenCL {
 		if (layerType == LayerType.FULLY) {
 		int size = 8;
 		groupSize = new int[] {
-							size, size, size,
-							size, size, size,
-							size, size, size,
+							16, 16, 8,
+							8, 8, 24,
+							8, 8, 16,
 							};
 		} else if (layerType == LayerType.POOL) {
 			int size = 8;

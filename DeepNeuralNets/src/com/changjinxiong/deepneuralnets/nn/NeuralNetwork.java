@@ -8,7 +8,7 @@ public interface NeuralNetwork {
 
 	public Layer getOutputLayer();
 
-	public void fordwardPass(float[] inputSamples);
+	public void forwardPass(float[] inputSamples);
 
 	public void backPropagation(float[] labels, int costType);
 

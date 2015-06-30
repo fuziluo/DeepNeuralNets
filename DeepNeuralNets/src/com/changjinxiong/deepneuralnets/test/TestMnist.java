@@ -172,7 +172,7 @@ public class TestMnist {
 		float[] image, l;
 		for (int i = 0; i < mp.getDatasetSize(); i ++) {
 			image = mp.getNextbatchInput();
-			mlp.fordwardPass(image);
+			mlp.forwardPass(image);
 			float[] a = mlp.getOutputLayer().getActivations();
 			int prediction = 0;
 			for (int j = 0; j < mp.getLabelDimension() - 1; j++) {
@@ -232,7 +232,7 @@ public class TestMnist {
 		int lrChangeCycle = 0;//5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
 		float lrChangeRate = 0.33f;
 		int epoch = 5;
-		int[][] cnnLayers = new int[][] {{1, 0, 0 ,0}, {20, 5, 5, 1},{2, 2}, {50, 5, 5, 1},{2, 2}, {500}, {10}};
+		int[][] cnnLayers = new int[][] {{1, 0, 0 ,0}, {20, 5, 5, 1},{2, 2, 2}, {50, 5, 5, 1},{2, 2, 2}, {500}, {10}};
 		String path = "/home/jxchang/project/records/mnist/.cnn.weights";
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
 		cnn.setInputShape(new int[] {28, 28});

@@ -51,7 +51,7 @@ public class TestMLP {
 //		assertEquals(l2.getActivations()[1], 0.750260, 0.00001);
 //		assertEquals(l3.getActivations()[0], 0.552876, 0.00001);
 		//test OpenCL
-		mlp.fordwardPass(new float[] {1, 2});
+		mlp.forwardPass(new float[] {1, 2});
 		assertEquals(l2.getActivations()[0], 0.622459, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.750260, 0.00001);
 		assertEquals(l3.getActivations()[0], 0.552876, 0.00001);
@@ -65,7 +65,7 @@ public class TestMLP {
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f});
 		l2.setActivationType(ActivationType.SIGMOID);
 		l3.setActivationType(ActivationType.SIGMOID);
-		mlp.fordwardPass(new float[] {1, 2});
+		mlp.forwardPass(new float[] {1, 2});
 		assertEquals(l2.getActivations()[0], 0.689974, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.880797, 0.00001);
 		assertEquals(l3.getActivations()[0], 0.6330112, 0.00001);
@@ -89,7 +89,7 @@ public class TestMLP {
 		l2.setActivationType(ActivationType.SIGMOID);
 		l3.setActivationType(ActivationType.SIGMOID);
 
-		mlp.fordwardPass(new float[] {1, 2});
+		mlp.forwardPass(new float[] {1, 2});
 		assertEquals(l2.getActivations()[0], 0.689974, 0.00001);
 		assertEquals(l2.getActivations()[1], 0.880797, 0.00001);
 		assertEquals(l3.getActivations()[0], 0.6330112, 0.00001);
@@ -136,7 +136,7 @@ public class TestMLP {
 				1, 1
 									
 									};
-		mlp.fordwardPass(tin);
+		mlp.forwardPass(tin);
 		float[] a1 = l2.getActivations();
 		float[] a11 = l3.getActivations();
 		mlp.backPropagation(tout, 0);
@@ -155,7 +155,7 @@ public class TestMLP {
 		l13.setActivationType(ActivationType.SIGMOID);
 			
 
-		mlp1.fordwardPass(tin);
+		mlp1.forwardPass(tin);
 		float c2 = mlp1.getCost(tout, 0);
 		float[] a2 = l12.getActivations();
 		float[] a12 = l13.getActivations();
@@ -193,7 +193,7 @@ public class TestMLP {
 //						1, 1};
 		float[] tin = mnistTraining.getNextbatchInput();
 		float[] tout = mnistTraining.getNextBatchLabel();
-		mlp.fordwardPass(tin);
+		mlp.forwardPass(tin);
 //		float c1 = mlp.getCost(tout);
 		mlp.backPropagation(tout, costType);
 		int i = 1;
@@ -204,12 +204,12 @@ public class TestMLP {
 		tempW[i] = (float) (w - e);
 		l3.setWeight(tempW);
 //		System.out.println(l3.getWeight()[i]);
-		mlp.fordwardPass(tin);
+		mlp.forwardPass(tin);
 		float c1 = mlp.getCost(tout, costType);
 		tempW[i] = (float) (w + e);
 		l3.setWeight(tempW);
 //		System.out.println(l3.getWeight()[i]);
-		mlp.fordwardPass(tin);
+		mlp.forwardPass(tin);
 		float c2 = mlp.getCost(tout, costType);
 		double g2 = (c2 - c1)/(2 * e);
 		System.out.println(c1+" "+c2);

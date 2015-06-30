@@ -40,7 +40,7 @@ public class TestPooling {
 		
 		float[] tin = tp.getNextbatchInput();
 		float[] tout = tp.getNextBatchLabel();
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		cnn.backPropagation(tout, 0);
 		int i = 0;
 		Layer l = l3;
@@ -52,14 +52,14 @@ public class TestPooling {
 		double e = 0.002f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		float c1 = cnn.getCost(tout, 0);
 //		float[] a1 = l.getActivations();
 
 		weights[i] = (float) (w + e);
 		l.setWeight(weights);
 
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		float c2 = cnn.getCost(tout, 0);
 		double g2 = (c2 - c1)/(2 * e);
 //		float[] a2 = l.getActivations();
@@ -93,7 +93,7 @@ public class TestPooling {
 		
 		float[] tin = tp.getNextbatchInput();
 		float[] tout = tp.getNextBatchLabel();
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		cnn.backPropagation(tout, 0);
 		int i = 0;
 		Layer l = l3;
@@ -105,14 +105,14 @@ public class TestPooling {
 		double e = 0.002f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		float c1 = cnn.getCost(tout, 0);
 //		float[] a1 = l.getActivations();
 
 		weights[i] = (float) (w + e);
 		l.setWeight(weights);
 
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		float c2 = cnn.getCost(tout, 0);
 		double g2 = (c2 - c1)/(2 * e);
 //		float[] a2 = l.getActivations();

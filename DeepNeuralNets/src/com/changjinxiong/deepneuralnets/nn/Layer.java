@@ -27,7 +27,9 @@ public interface Layer {
 	public int getNumOfNodes();
 //	public cl_mem getWeightCL();
 	public cl_mem getActivationsCL();
+	public void releaseActivationsCL();
 	public cl_mem getPrevErrorsCL();
+	public void releasePrevErrorsCL();
 	public void setActivationType(ActivationType type);
 	public ActivationType getActivationType();
 	public void releaseCLMem();

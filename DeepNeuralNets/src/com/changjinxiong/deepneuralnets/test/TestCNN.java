@@ -64,7 +64,7 @@ public class TestCNN {
 		System.out.println(Arrays.toString(actCorrect));
 		System.out.println(Arrays.toString(act));
 		assertArrayEquals("!!",actCorrect,act, 0.0001f);
-		OpenCL.releaseAll();
+//		OpenCL.releaseAll();
 
 	}
 
@@ -109,7 +109,7 @@ public class TestCNN {
 		}
 		System.out.println(Arrays.toString(act));
 		assertArrayEquals("!!",act,actCorrect, 0.0001f);
-		OpenCL.releaseAll();
+//		OpenCL.releaseAll();
 	}
 	
 	@Test
@@ -166,7 +166,7 @@ public class TestCNN {
 		System.out.println(Arrays.toString(actCorrect));
 		System.out.println(Arrays.toString(act));
 		assertArrayEquals("!!",actCorrect,act, 0.0001f);
-		OpenCL.releaseAll();
+//		OpenCL.releaseAll();
 	}
 	
 	@Test
@@ -209,10 +209,11 @@ public class TestCNN {
 		};
 		int[] inputShape = {4, 4};
 		cnn.setInputShape(inputShape);
-		cnn.fordwardPass(testInput);
+		cnn.forwardPass(testInput);
 		assertEquals(l4.getWeight().length, 16, 0);
 		float[] act = l5.getActivations();
 //		System.out.println(Arrays.toString(act));
+//		OpenCL.releaseAll();
 	}
 
 	@Test
@@ -268,7 +269,7 @@ public class TestCNN {
 								0.6229384f, 0.81499475f, 0.9215472f, 0.96906114f
 		};
 		
-		cnn.fordwardPass(testInput);
+		cnn.forwardPass(testInput);
 		assertEquals(l3.getWeight().length, 36, 0);
 		float[] act2 = l2.getActivations();
 		float[] act3 = l3.getActivations();
@@ -276,7 +277,7 @@ public class TestCNN {
 		System.out.println(Arrays.toString(act3));
 
 		assertArrayEquals("!!",act3,actCorrect, 0.0001f);
-		OpenCL.releaseAll();
+//		OpenCL.releaseAll();
 	}
 
 	@Test
@@ -302,7 +303,7 @@ public class TestCNN {
 		
 		float[] tin = tp.getNextbatchInput();
 		float[] tout = tp.getNextBatchLabel();
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		
 		cnn.backPropagation(tout, costType);
 		int i = 0;
@@ -313,14 +314,14 @@ public class TestCNN {
 		double e = 0.002f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		float c1 = cnn.getCost(tout, costType);
 //		float[] a1 = l.getActivations();
 
 		weights[i] = (float) (w + e);
 		l.setWeight(weights);
 
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		float c2 = cnn.getCost(tout, costType);
 		double g2 = (c2 - c1)/(2 * e);
 //		float[] a2 = l.getActivations();
@@ -331,7 +332,7 @@ public class TestCNN {
 		assertEquals(1, g1/g2, 0.0015);
 //		assertEquals(0, (g1-g2)/(Math.abs(g1)+Math.abs(g2)), 0.000015);
 		cnn.releaseCLMem();
-		OpenCL.releaseAll();
+//		OpenCL.releaseAll();
 	}
 	@Test
 	public void gradientCheckPadding() {
@@ -356,7 +357,7 @@ public class TestCNN {
 		
 		float[] tin = tp.getNextbatchInput();
 		float[] tout = tp.getNextBatchLabel();
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		
 		cnn.backPropagation(tout, costType);
 		int i = 0;
@@ -367,14 +368,14 @@ public class TestCNN {
 		double e = 0.002f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		float c1 = cnn.getCost(tout, costType);
 //		float[] a1 = l.getActivations();
 
 		weights[i] = (float) (w + e);
 		l.setWeight(weights);
 
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		float c2 = cnn.getCost(tout, costType);
 		double g2 = (c2 - c1)/(2 * e);
 //		float[] a2 = l.getActivations();
@@ -385,7 +386,7 @@ public class TestCNN {
 		assertEquals(1, g1/g2, 0.0015);
 //		assertEquals(0, (g1-g2)/(Math.abs(g1)+Math.abs(g2)), 0.000015);
 		cnn.releaseCLMem();
-		OpenCL.releaseAll();
+//		OpenCL.releaseAll();
 	}
 	@Test
 	public void testOpenCL() {
@@ -420,7 +421,7 @@ public class TestCNN {
 		Layer l4 = l3.getNextLayer();
 		cnn.setInputShape(new int[] {32, 32});
 //		cnn.setInputShape(new int[] {3, 3});
-		cnn.fordwardPass(tin);
+		cnn.forwardPass(tin);
 		float[] a1 = l2.getActivations();
 		
 		useOpenCL = true;
@@ -431,7 +432,7 @@ public class TestCNN {
 		Layer l14 = l13.getNextLayer();
 		cnn1.setInputShape(new int[] {32, 32});
 //		cnn1.setInputShape(new int[] {3, 3});
-		cnn1.fordwardPass(tin);
+		cnn1.forwardPass(tin);
 		float[] a2 = l12.getActivations();
 //		System.out.println("a1 "+ a1.length + Arrays.toString(a1));
 //		System.out.println("a2 "+ a2.length + Arrays.toString(a2));
@@ -450,7 +451,7 @@ public class TestCNN {
 //		System.out.println("g1 "+ g1.length + Arrays.toString(g1));
 //		System.out.println("g2 "+ g2.length + Arrays.toString(g2));
 		assertArrayEquals("!!",g1,g2, 0.001f);
-		OpenCL.releaseAll();
+//		OpenCL.releaseAll();
 
 	}
 

@@ -114,7 +114,6 @@ public class PoolingLayer implements FeatureMapLayer {
 			}
 			return;
 		}
-		prevErrors = new float[batchSize * previousLayer.getNumOfNodes()];
 		if (useOpenCL) {
 			backPropOpenCL();
 		} else {
@@ -129,8 +128,8 @@ public class PoolingLayer implements FeatureMapLayer {
 		cl_command_queue commandQueue = OpenCL.getCommandQueue();
 		cl_mem arg0 = nextLayer.getPrevErrorsCL();
 		cl_mem arg1 = previousLayer.getActivationsCL();
-		prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, prevErrors.length* Sizeof.cl_float, null, null);
-		clEnqueueFillBuffer(commandQueue, prevErrorsCL, Pointer.to(new float[] {0}), 1, 0, prevErrors.length* Sizeof.cl_float, 0, null, null );
+		prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, batchSize * previousLayer.getNumOfNodes() * Sizeof.cl_float, null, null);
+		clEnqueueFillBuffer(commandQueue, prevErrorsCL, Pointer.to(new float[] {0}), 1, 0, batchSize * previousLayer.getNumOfNodes() * Sizeof.cl_float, 0, null, null );
 		cl_mem arg2 = prevErrorsCL;
 		clSetKernelArg(kernel1, 0, Sizeof.cl_mem, Pointer.to(arg0));
 		clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg1));
@@ -139,12 +138,12 @@ public class PoolingLayer implements FeatureMapLayer {
 				(long) ceil(numOfFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1]};
 		clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
 		clFinish(commandQueue);
-		clReleaseMemObject(arg0);		
-		clReleaseMemObject(activationsCL);	
-		activationsCL = null;
+		nextLayer.releasePrevErrorsCL();
+		releaseActivationsCL();
 	}
 
 	private void backPropNoAcc() {
+		prevErrors = new float[batchSize * previousLayer.getNumOfNodes()];
 		errors = nextLayer.getPrevErrors();
 		float[] preAct = previousLayer.getActivations();
 		for (int i = 0; i < batchSize; i++) {
@@ -213,7 +212,6 @@ public class PoolingLayer implements FeatureMapLayer {
 	public void forwardPass() {
 		batchSize = previousLayer.getBatchSize(); //update batch size
 		updateFeatureMapsShapes();
-		activations = new float[batchSize * numOfFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1]];
 		if (useOpenCL) {
 			forwardPassOpenCL();
 		} else {
@@ -229,7 +227,8 @@ public class PoolingLayer implements FeatureMapLayer {
 		if (activationsCL != null) {
 			clReleaseMemObject(activationsCL);
 		}
-		activationsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, activations.length* Sizeof.cl_float, null, null);
+		long activationsLen = batchSize * numOfFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1];
+		activationsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, activationsLen * Sizeof.cl_float, null, null);
 		cl_mem arg1 = activationsCL;
 		clSetKernelArg(kernel0, 0, Sizeof.cl_mem, Pointer.to(arg0));
         clSetKernelArg(kernel0, 1, Sizeof.cl_mem, Pointer.to(arg1));
@@ -240,6 +239,7 @@ public class PoolingLayer implements FeatureMapLayer {
 	}
 
 	private void forwardPassNoAcc() {
+		activations = new float[batchSize * numOfFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1]];
 		float[] preAct = previousLayer.getActivations();
 		for (int i = 0; i < batchSize; i++) {
 			int inputBatchOffset = i * numOfFeatureMaps * inputFeatureMapsShape[0] * inputFeatureMapsShape[1];
@@ -309,6 +309,7 @@ public class PoolingLayer implements FeatureMapLayer {
 	@Override
 	public float[] getActivations() {
 		if (useOpenCL && previousLayer != null) {
+			activations = new float[batchSize * numOfFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1]];
 			cl_command_queue commandQueue = OpenCL.getCommandQueue();
 	        clEnqueueReadBuffer(commandQueue, activationsCL, CL_TRUE, 0, activations.length * Sizeof.cl_float, Pointer.to(activations), 0, null, null);
 		}
@@ -321,6 +322,7 @@ public class PoolingLayer implements FeatureMapLayer {
 			throw new IllegalStateException("No prevErrors on input layer or the second layer!");
 		}
 		if (useOpenCL) {
+			prevErrors = new float[batchSize * previousLayer.getNumOfNodes()];
 			clEnqueueReadBuffer(OpenCL.getCommandQueue(), prevErrorsCL, CL_TRUE, 0, prevErrors.length * Sizeof.cl_float, Pointer.to(prevErrors), 0, null, null);
 		}
 		return prevErrors;
@@ -378,15 +380,12 @@ public class PoolingLayer implements FeatureMapLayer {
 		
 			//calculating output feature map size from input feature map size
 			int h = 0, w = 0;
-			if (inputFeatureMapsShape[0] > poolHeight && inputFeatureMapsShape[1] > poolWidth) {
-				if (true) {//FIXME
-					h = (inputFeatureMapsShape[0] - 1) / stride + 1;
-					w = (inputFeatureMapsShape[1] - 1) / stride + 1;
-
-				} else {
-					h = (inputFeatureMapsShape[0] - poolHeight) / stride + 1;
-					w = (inputFeatureMapsShape[1] - poolWidth) / stride + 1;
-				}
+			if (inputFeatureMapsShape[0] >= poolHeight && inputFeatureMapsShape[1] >= poolWidth) {
+				h = (inputFeatureMapsShape[0] - 1) / stride + 1;
+				w = (inputFeatureMapsShape[1] - 1) / stride + 1;
+	
+//				h = (inputFeatureMapsShape[0] - poolHeight) / stride + 1;
+//				w = (inputFeatureMapsShape[1] - poolWidth) / stride + 1;
 			}			
 			outputFeatureMapsShape = new int[] {h, w};
 			if (useOpenCL) {
@@ -447,13 +446,26 @@ public class PoolingLayer implements FeatureMapLayer {
 				clReleaseMemObject(activationsCL);
 				activationsCL = null;
 			}
-//			if (prevErrorsCL != null) {
-//				clReleaseMemObject(prevErrorsCL);
-//				prevErrorsCL = null;
-//			}
+			if (prevErrorsCL != null) {
+				clReleaseMemObject(prevErrorsCL);
+				prevErrorsCL = null;
+			}
 		}
 //        clReleaseKernel(kernel0);
 //        clReleaseKernel(kernel1);
 	}
-
+	@Override
+	public void releaseActivationsCL() {
+		if(useOpenCL && activationsCL != null) {
+			clReleaseMemObject(activationsCL);	
+			activationsCL = null;
+		}
+	}
+	@Override
+	public void releasePrevErrorsCL() {
+		if(useOpenCL && prevErrorsCL != null) {
+			clReleaseMemObject(prevErrorsCL);
+			prevErrorsCL = null;
+		}
+	}
 }
