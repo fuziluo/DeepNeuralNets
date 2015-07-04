@@ -71,7 +71,8 @@ public class TestMLP {
 		assertEquals(l3.getActivations()[0], 0.6330112, 0.00001);
 		
 		//check cost
-		float cost = mlp.getCost(new float[] {1}, 0);
+		mlp.calCostErr(new float[] {1}, 0);
+		float cost = mlp.getCost();
 		assertEquals(cost, 0.4573, 0.0001);
 	}
 
@@ -140,7 +141,8 @@ public class TestMLP {
 		float[] a1 = l2.getActivations();
 		float[] a11 = l3.getActivations();
 		mlp.backPropagation(tout, 0);
-		float c1 = mlp.getCost(tout, 0);
+		mlp.calCostErr(tout, 0);
+		float c1 = mlp.getCost();
 		float[] g1 = l2.getGradients();
 		float[] g11 = l3.getGradients();
 //		float[] e1 = l3.getPrevErrors();
@@ -156,7 +158,8 @@ public class TestMLP {
 			
 
 		mlp1.forwardPass(tin);
-		float c2 = mlp1.getCost(tout, 0);
+		mlp1.calCostErr(tout, 0);
+		float c2 = mlp1.getCost();
 		float[] a2 = l12.getActivations();
 		float[] a12 = l13.getActivations();
 		mlp1.backPropagation(tout, 0);
@@ -181,10 +184,70 @@ public class TestMLP {
 	@Test
 	public void gradientCheck() {
 		boolean useOpenCL = true;
+//		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{784,300,300,10}, true, useOpenCL);
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{8,10,5,3}, true, useOpenCL);
+		Layer l4 = mlp.getOutputLayer();
+		Layer l3 = l4.getPreviousLayer();
+		Layer l2 = l3.getPreviousLayer();
+		int costType = 0;
+		int batchSize = 8;
+		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
+
+//		float[] tin = mnistTraining.getNextbatchInput();
+//		float[] tout = mnistTraining.getNextBatchLabel();
+		float[] tin = new float[] {	
+				1, 2, 1, 3, 4, 1, 1, 2,  
+				5, 2, 1, 3, 5, 1, 1, 2,  
+				1, 2, 1, 3, 4, 1, 1, 0,  
+				1, 2, 1, 3, 0, 1, 1, 3,
+				7, 9, 1, 7, 4, 1, 1, 2,  
+				1, 2, 1, 3, 2, 1, 1, 2, 
+				1, 1, 1, 3, 3, 1, 1, 1, 
+				1, 2, 1, 3, 4, 1, 1, 1, 
+									};
+		float[] tout = new float[] {
+				1, 1, 1, 1, 1, 0, 1, 1, 
+				1, 0, 1, 1, 1, 1, 1, 1, 
+				1, 1, 0, 0, 1, 0, 1, 1, 									
+									};
+		
+		mlp.forwardPass(tin);
+		mlp.backPropagation(tout, costType);
+		int i = 1;
+		Layer l = l2;
+		float g1 = l.getGradients()[i];
+		double w = l.getWeight()[i];
+		double e = 0.005f;
+		float[] tempW = l.getWeight();
+		tempW[i] = (float) (w - e);
+		l.setWeight(tempW);
+//		System.out.println(l3.getWeight()[i]);
+		mlp.forwardPass(tin);
+		mlp.calCostErr(tout, costType);
+		float c1 = mlp.getCost();
+		tempW[i] = (float) (w + e);
+		l.setWeight(tempW);
+//		System.out.println(l3.getWeight()[i]);
+		mlp.forwardPass(tin);
+		mlp.calCostErr(tout, costType);
+		float c2 = mlp.getCost();
+		double g2 = (c2 - c1)/(2 * e);
+		System.out.println(c1+" "+c2);
+		System.out.println(g1+" "+g2);
+		assertEquals(1, g1/g2, 0.002);
+
+	}
+
+	@Test
+	public void gradientCheckReLU() {
+		boolean useOpenCL = true;
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{784,300,10}, true, useOpenCL);
 		Layer l3 = mlp.getOutputLayer();
-		int costType = 1;
-		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", 100, false);
+		Layer l2 = l3.getPreviousLayer();
+		l2.setActivationType(ActivationType.RELU);
+		l3.setActivationType(ActivationType.NONE);
+		int costType = 0;
+		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", 20, false);
 //		float[] tin = {	0.1f, 0.2f, 0.3f, 1,
 //						0.4f, 0.5f, 0.6f, 1,
 //						0.7f, 0.8f, 0.9f, 1};
@@ -196,25 +259,28 @@ public class TestMLP {
 		mlp.forwardPass(tin);
 //		float c1 = mlp.getCost(tout);
 		mlp.backPropagation(tout, costType);
-		int i = 1;
-		float g1 = l3.getGradients()[i];
-		double w = l3.getWeight()[i];
+		int i = 2;
+		Layer l = l3;
+		float g1 = l.getGradients()[i];
+		double w = l.getWeight()[i];
 		double e = 0.01f;
-		float[] tempW = l3.getWeight();
+		float[] tempW = l.getWeight();
 		tempW[i] = (float) (w - e);
-		l3.setWeight(tempW);
+		l.setWeight(tempW);
 //		System.out.println(l3.getWeight()[i]);
 		mlp.forwardPass(tin);
-		float c1 = mlp.getCost(tout, costType);
+		mlp.calCostErr(tout, costType);
+		float c1 = mlp.getCost();
 		tempW[i] = (float) (w + e);
-		l3.setWeight(tempW);
+		l.setWeight(tempW);
 //		System.out.println(l3.getWeight()[i]);
 		mlp.forwardPass(tin);
-		float c2 = mlp.getCost(tout, costType);
+		mlp.calCostErr(tout, costType);
+		float c2 = mlp.getCost();
 		double g2 = (c2 - c1)/(2 * e);
 		System.out.println(c1+" "+c2);
 		System.out.println(g1+" "+g2);
-		assertEquals(1, g1/g2, 5e-4);
+		assertEquals(g2, g1, 5e-4);
 
 	}
 	

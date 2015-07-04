@@ -140,14 +140,14 @@ public final class OpenCL {
 	 * @param para integer array of length storing parameters for generating kernels
 	 * @return
 	 */
-	public static final cl_program getProgram(LayerType layerType, ActivationType actType , int[] para) {
+	public static final cl_program getProgram(LayerType layerType, int[] para) {
     	//TODO add other activation functions
 //		if (layerType == LayerType.POOL) {
 //			throw new IllegalArgumentException("Layer type not supported yet");
 //		}
-		if (layerType == LayerType.FULLY && actType != ActivationType.SIGMOID) {
-			throw new IllegalArgumentException("Activation fuction not supported yet for this layer type");
-		}
+//		if (layerType == LayerType.FULLY && actType != ActivationType.SIGMOID) {
+//			throw new IllegalArgumentException("Activation fuction not supported yet for this layer type");
+//		}
 //		if (kernelDims == null || kernelDims.length != 9) {
 //			throw new IllegalArgumentException("Incorrect kernel dimensions");
 //		}
@@ -180,9 +180,14 @@ public final class OpenCL {
 			fileContent = "#define SIGMOID " + ActivationType.SIGMOID.getValue()  + "\n" + fileContent;
 			fileContent = "#define RELU " + ActivationType.RELU.getValue()  + "\n" + fileContent;
 			fileContent = "#define TANH " + ActivationType.TANH.getValue()  + "\n" + fileContent;
+			fileContent = "#define NONE " + ActivationType.NONE.getValue()  + "\n" + fileContent;
 			if (layerType == LayerType.FULLY) {
-				fileContent = "#define activationType " + para[9] + "\n" + fileContent;
-				fileContent = "#define prevActivationType " + para[10] + "\n" + fileContent;
+				fileContent = "#define batchSize " + para[0] + "\n" + fileContent;
+				fileContent = "#define numOfPerceptrons " + para[1] + "\n" + fileContent;
+				fileContent = "#define weightsDim " + para[2] + "\n" + fileContent;
+				fileContent = "#define prevActDim " + para[3] + "\n" + fileContent;
+				fileContent = "#define activationType " + para[4] + "\n" + fileContent;
+				fileContent = "#define prevActivationType " + para[5] + "\n" + fileContent;
 //				System.out.println(fileContent);
 			}			
 			if (layerType == LayerType.CONV) {
@@ -217,6 +222,8 @@ public final class OpenCL {
 				fileContent = "#define poolWidth " + para[9] + "\n" + fileContent;
 				fileContent = "#define stride " + para[10] + "\n" + fileContent;
 				fileContent = "#define batchSize " + para[11] + "\n" + fileContent;
+				fileContent = "#define activationType " + para[12] + "\n" + fileContent;
+				fileContent = "#define prevActivationType " + para[13] + "\n" + fileContent;
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -294,9 +301,9 @@ public final class OpenCL {
 								4, 4, 16,
 								};
 			groupSize = new int[] {
-					8, 4, 8,
-					4, 8, 8,
-					8, 4, 8,
+					8, 4, 2,
+					6, 10, 1,
+					8, 8, 1,
 					};
 		}
 

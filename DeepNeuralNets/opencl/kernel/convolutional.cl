@@ -4,8 +4,12 @@
 float activationFunction(float input) {
   float output = 0;
   switch (activationType) {
+  case NONE:
+    output = input;
+    break;
   case RELU:
     output = max(0, input);
+    // output = input > 0 ? input : 0.01 * input;
     break;
   case SIGMOID:
     output = (1/(1 + exp(-input)));
@@ -21,8 +25,12 @@ float activationFunction(float input) {
 float derivative(float input) {
   float output = 0;
   switch (prevActivationType) {
+  case NONE:
+    output = 1;
+    break;
   case RELU:
     output = input > 0 ? 1 : 0;
+    // output = input > 0 ? 1 : 0.01;
     break;
   case SIGMOID:
     output = input * (1 - input);
@@ -89,7 +97,7 @@ void atomic_add_global(volatile global float *source, const float operand) {
           out += weights[gb1 *  weightsDim + weightsDim - 1];
         }
       }
-      outputFeatureMaps[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] = activationFunction(out);
+      outputFeatureMaps[featureMapOffsetOut + gb0] = activationFunction(out);
     }
   }
 
@@ -118,10 +126,10 @@ void atomic_add_global(volatile global float *source, const float operand) {
             int colIn = gb0 % filterW + colOut * stride;
             if (rowIn < inputFeatureMapH && colIn < inputFeatureMapW) {
               out += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] 
-              * errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+              * errors[featureMapOffsetOut + j] / batchSize;
             }
           } else if (addBias == 1) {
-            out += errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+            out += errors[featureMapOffsetOut + j] / batchSize;
           }
         }
       }
@@ -137,7 +145,41 @@ void atomic_add_global(volatile global float *source, const float operand) {
     }
   }
 
-
+/*__kernel void backCalcGradients(__global float *inputFeatureMaps,
+                                  __global float *errors, 
+                                  __global float *gradients)
+{
+  // int lo0 = get_local_id(0), lo1 = get_local_id(1);
+  int gb0 = get_global_id(0), gb1 = get_global_id(1);
+  int weightsDim = filterW * filterH + (addBias ? 1 : 0);
+  if (gb0 < weightsDim && gb1 < numOfOutputFeatureMaps) {
+    float out = 0;
+    for (int i = 0; i < batchSize; i++) {
+      int batchOffsetIn = i * numOfInputFeatureMaps * inputFeatureMapH * inputFeatureMapW;
+      int batchOffsetOut = i * (numOfOutputFeatureMaps * outputFeatureMapH * outputFeatureMapW);
+      int featureMapOffsetOut = batchOffsetOut + gb1 * outputFeatureMapH * outputFeatureMapW;
+      for (int j = 0; j < outputFeatureMapH * outputFeatureMapW; j++) {
+        int rowOut = j / outputFeatureMapW;
+        int colOut = j % outputFeatureMapW;
+        for (int k = 0; k < numOfInputFeatureMaps; k++) {
+          int featureMapOffsetIn = batchOffsetIn + k * inputFeatureMapH * inputFeatureMapW;
+          if (gb0 < weightsDim - 1) {
+            int rowIn = gb0 / filterW + rowOut * stride;
+            int colIn = gb0 % filterW + colOut * stride;
+            if (rowIn < inputFeatureMapH && colIn < inputFeatureMapW) {
+              out += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] 
+              * errors[featureMapOffsetOut + j] / batchSize;
+            }
+          } else if (addBias == 1) {
+            out += errors[featureMapOffsetOut + j] / batchSize;
+          }
+        }
+      }
+    }
+    // barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+    gradients[gb1 * weightsDim + gb0] = out;
+  }
+}*/
 
   //parallel on 3 dimension, seems to be much faster!!!
   __kernel void backCalcPrevErr(__global float *weights,
@@ -238,7 +280,7 @@ __kernel void forwardPass(__global float *inputFeatureMaps,
           out += weights[gb1 *  weightsDim + weightsDim - 1];
         }
       }
-      outputFeatureMaps[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] = activationFunction(out);
+      outputFeatureMaps[featureMapOffsetOut + gb0] = activationFunction(out);
     // }
   }
 }
@@ -340,9 +382,7 @@ __kernel void forwardPass(__global float *inputFeatureMaps,
                                   __global float *errors, 
                                   __global float *gradients)
 {
-  // int lo0 = get_local_id(0), lo1 = get_local_id(1);
   int gb0 = get_global_id(0), gb1 = get_global_id(1);
-  // __local float shared_E[groupSize_k0_N * (filterW * filterH + (addBias ? 1 : 0))];
   int weightsDim = filterW * filterH + (addBias ? 1 : 0);
   if (gb0 < weightsDim && gb1 < numOfOutputFeatureMaps) {
     float out = 0;
@@ -359,9 +399,9 @@ __kernel void forwardPass(__global float *inputFeatureMaps,
             int rowIn = gb0 / filterW + rowOut * stride;
             int colIn = gb0 % filterW + colOut * stride;
             out += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] 
-            * errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+            * errors[featureMapOffsetOut + j] / batchSize;
           } else if (addBias == 1) {
-            out += errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+            out += errors[featureMapOffsetOut + j] / batchSize;
           }
         }
       }
@@ -435,9 +475,9 @@ __kernel void backCalcGradients(__global float *inputFeatureMaps,
           int rowIn = gb0 / filterW + rowOut * stride;
           int colIn = gb0 % filterW + colOut * stride;
           out += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] 
-          * errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+          * errors[featureMapOffsetOut + j] / batchSize;
         } else if (addBias == 1) {
-          out += errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
+          out += errors[featureMapOffsetOut + j] / batchSize;
         }
       }
     }
@@ -454,37 +494,6 @@ __kernel void backCalcGradients(__global float *inputFeatureMaps,
 }
 
 
-// incomplete, need to use atomic operation
-// __kernel void backCalcGradients(__global float *inputFeatureMaps,
-//                                   __global float *errors, 
-//                                   __global float *gradients)
-// {
-//   // int lo0 = get_local_id(0), lo1 = get_local_id(1);
-//   int gb0 = get_global_id(0), gb1 = get_global_id(1);
-//   // __local float shared_E[groupSize_k0_N * (filterW * filterH + (addBias ? 1 : 0))];
-//   int weightsDim = filterW * filterH + (addBias ? 1 : 0);
-//   if (gb0 < outputFeatureMapH * outputFeatureMapW && gb1 < numOfOutputFeatureMaps) {
-//     for (int i = 0; i < batchSize; i++) {
-//       int batchOffsetIn = i * numOfInputFeatureMaps * inputFeatureMapH * inputFeatureMapW;
-//       int batchOffsetOut = i * (numOfOutputFeatureMaps * outputFeatureMapH * outputFeatureMapW);
-//       int featureMapOffsetOut = batchOffsetOut + gb1 * outputFeatureMapH * outputFeatureMapW;
-//       int rowOut = gb0 / outputFeatureMapW;
-//       int colOut = gb0 % outputFeatureMapW;
-//       for (int k = 0; k < numOfInputFeatureMaps; k++) {
-//         int featureMapOffsetIn = batchOffsetIn + k * inputFeatureMapH * inputFeatureMapW;
-//         for (int l = 0; l < filterW * filterH; l++) {
-//           int rowIn = l / filterW + rowOut * stride;
-//           int colIn = l % filterW + colOut * stride;
-//           gradients[gb1 * weightsDim + l] += inputFeatureMaps[featureMapOffsetIn + rowIn * inputFeatureMapW + colIn] 
-//                                               * errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
-//         }
-//         if (addBias == 1) {
-//           gradients[gb1 * weightsDim + weightsDim - 1] += errors[featureMapOffsetOut + rowOut * outputFeatureMapW + colOut] / batchSize;
-//         }
-//       }
-//     }
-//   }
-// }
 
 // first dimension of work size on filterW * filterH, need to initialize prevErrors to zero
 /*__kernel void backCalcPrevErr(__global float *weights,
@@ -694,15 +703,20 @@ __kernel void updateWeights(__global float *gradients, __global float *weights, 
     float private_weights[1];
     float private_weightsUpdate[1];
 
-    for (int c0 = 128 * b0; c0 < len; c0 += 32768)
-      if (len >= t0 + c0 + 1) {
+    float lr = learningRate;
+
+    for (int c0 = 128 * b0; c0 < len; c0 += 32768) {
+     if (addBias == 1 && (c0 + t0) % (filterW * filterH + (addBias ? 1 : 0)) == filterW * filterH )
+        lr = 2 * learningRate;
+     if (len >= t0 + c0 + 1) {
         private_weights[0] = weights[t0 + c0];
         private_weightsUpdate[0] = weightsUpdate[t0 + c0];
-        private_weightsUpdate[0] = (((momentum * private_weightsUpdate[0]) - (learningRate * gradients[t0 + c0])) - ((learningRate * weightDecay_batchSize) * private_weights[0]));
+        private_weightsUpdate[0] = (((momentum * private_weightsUpdate[0]) - (lr * gradients[t0 + c0])) - ((lr * weightDecay_batchSize) * private_weights[0]));
         private_weights[0] += private_weightsUpdate[0];
         weightsUpdate[t0 + c0] = private_weightsUpdate[0];
         weights[t0 + c0] = private_weights[0];
       }
+    }
 }
 
 

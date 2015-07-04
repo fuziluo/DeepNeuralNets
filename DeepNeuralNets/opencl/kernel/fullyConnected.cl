@@ -5,8 +5,12 @@
 float activationFunction(float input) {
   float output = 0;
   switch (activationType) {
+  case NONE:
+    output = input;
+    break;
   case RELU:
     output = max(0, input);
+    // output = input > 0 ? input : 0.01 * input;
     break;
   case SIGMOID:
     output = (1/(1 + exp(-input)));
@@ -23,8 +27,12 @@ float activationFunction(float input) {
 float derivative(float input) {
   float output = 0;
   switch (prevActivationType) {
+  case NONE:
+    output = 1;
+    break;
   case RELU:
     output = input > 0 ? 1 : 0;
+    // output = input > 0 ? 1 : 0.01;
     break;
   case SIGMOID:
     output = input * (1 - input);
@@ -38,7 +46,7 @@ float derivative(float input) {
   return output;
 }
 
-__kernel void forwardPass(__global float *preActivations, __global float *weights, __global float *activations, int batchSize, int numOfPerceptrons, int weightsDim, int prevActDim)
+__kernel void forwardPass(__global float *preActivations, __global float *weights, __global float *activations)//, int batchSize, int numOfPerceptrons, int weightsDim, int prevActDim)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
@@ -99,7 +107,7 @@ __kernel void forwardPass(__global float *preActivations, __global float *weight
       }
 }
 
-__kernel void backCalcGradients(__global float *error, __global float *preActivations, __global float *gradients, int numOfPerceptrons, int weightsDim, int batchSize, int prevActDim)
+__kernel void backCalcGradients(__global float *error, __global float *preActivations, __global float *gradients)//, int numOfPerceptrons, int weightsDim, int batchSize, int prevActDim)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
@@ -159,7 +167,7 @@ __kernel void backCalcGradients(__global float *error, __global float *preActiva
 }
 
 __kernel void backCalcPrevErr(__global float *error, __global float *weights, __global float *prevError, 
-                                          int batchSize, int prevActDim, int numOfPerceptrons, int weightsDim, __global float *prevActivations)
+                                          /*int batchSize, int prevActDim, int numOfPerceptrons, int weightsDim, */__global float *prevActivations)
 {
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
@@ -227,14 +235,19 @@ __kernel void updateWeights(__global float *gradients, __global float *weights, 
     float private_weights[1];
     float private_weightsUpdate[1];
 
-    for (int c0 = 128 * b0; c0 < len; c0 += 32768)
+    float lr = learningRate;
+
+    for (int c0 = 128 * b0; c0 < len; c0 += 32768) {
+      if (weightsDim != prevActDim && (c0 + t0) % weightsDim == prevActDim )
+        lr = 2 * learningRate;
       if (len >= t0 + c0 + 1) {
         private_weights[0] = weights[t0 + c0];
         private_weightsUpdate[0] = weightsUpdate[t0 + c0];
-        private_weightsUpdate[0] = (((momentum * private_weightsUpdate[0]) - (learningRate * gradients[t0 + c0])) - ((learningRate * weightDecay_batchSize) * private_weights[0]));
+        private_weightsUpdate[0] = (((momentum * private_weightsUpdate[0]) - (lr * gradients[t0 + c0])) - ((lr * weightDecay_batchSize) * private_weights[0]));
         private_weights[0] += private_weightsUpdate[0];
         weightsUpdate[t0 + c0] = private_weightsUpdate[0];
         weights[t0 + c0] = private_weights[0];
       }
+    }
 }
 

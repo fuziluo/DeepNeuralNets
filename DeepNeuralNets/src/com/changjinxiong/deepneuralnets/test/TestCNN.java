@@ -10,9 +10,12 @@ import org.junit.Test;
 import com.changjinxiong.deepneuralnets.nn.ConvolutionalLayer;
 import com.changjinxiong.deepneuralnets.nn.ConvolutionalNeuralNetwork;
 import com.changjinxiong.deepneuralnets.nn.FeatureMapLayer;
+import com.changjinxiong.deepneuralnets.nn.FullyConnectedLayer;
 import com.changjinxiong.deepneuralnets.nn.Layer;
 import com.changjinxiong.deepneuralnets.nn.MultiLayerPerceptron;
 import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
+import com.changjinxiong.deepneuralnets.nn.PoolingLayer;
+import com.changjinxiong.deepneuralnets.nn.PoolingLayer.PoolingType;
 import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 import com.changjinxiong.deepneuralnets.test.CIFAR10DataProvider.DatasetType;
@@ -283,11 +286,11 @@ public class TestCNN {
 	@Test
 	public void gradientCheck() {
 //		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
-		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {10, 3, 3, 1}, {10}};
+		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = true;
-		int costType = 1;
-		int batchSize = 100;
+		int costType = 0;
+		int batchSize = 10;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, false, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
@@ -311,18 +314,20 @@ public class TestCNN {
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.002f;
+		double e = 0.02f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
-		float c1 = cnn.getCost(tout, costType);
+		cnn.calCostErr(tout, costType);
+		float c1 = cnn.getCost();
 //		float[] a1 = l.getActivations();
 
 		weights[i] = (float) (w + e);
 		l.setWeight(weights);
 
 		cnn.forwardPass(tin);
-		float c2 = cnn.getCost(tout, costType);
+		cnn.calCostErr(tout, costType);
+		float c2 = cnn.getCost();
 		double g2 = (c2 - c1)/(2 * e);
 //		float[] a2 = l.getActivations();
 //		assertArrayEquals("!!",a1,a2, 0.0001f);
@@ -334,6 +339,108 @@ public class TestCNN {
 		cnn.releaseCLMem();
 //		OpenCL.releaseAll();
 	}
+	
+	@Test
+	public void gradientCheckReLU() {
+//		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
+//		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
+		int[][] para = new int[][] {	
+				{3, 0, 0 ,0}, 
+				{32, 5, 5, 1},
+				{3, 3, 2}, 
+				{32, 5, 5, 1},
+				{3, 3, 2}, 
+				{64, 5, 5, 1}, 
+				{3, 3, 2}, 
+				{64},
+				{10}
+				};
+		boolean addBias = true;
+		boolean useOpenCL = true;
+		int costType = 0;
+		int batchSize = 100;
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, true, useOpenCL);
+//		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
+//		Layer l2 = l1.getNextLayer();
+//		Layer l3 = l2.getNextLayer();
+//		Layer l4 = l3.getNextLayer();
+//		l2.setActivationType(ActivationType.RELU);
+//		l3.setActivationType(ActivationType.RELU);
+//		l4.setActivationType(ActivationType.NONE);
+
+		Layer l1 = cnn.getInputLayer();
+		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
+		PoolingLayer l3 = (PoolingLayer) l2.getNextLayer();
+		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
+		PoolingLayer l5 = (PoolingLayer) l4.getNextLayer();
+		ConvolutionalLayer l6 = (ConvolutionalLayer) l5.getNextLayer();
+		PoolingLayer l7 = (PoolingLayer) l6.getNextLayer();
+		FullyConnectedLayer l8 = (FullyConnectedLayer) l7.getNextLayer();
+		FullyConnectedLayer l9 = (FullyConnectedLayer) l8.getNextLayer();
+
+		l2.setActivationType(ActivationType.RELU);
+		l4.setActivationType(ActivationType.RELU);
+		l6.setActivationType(ActivationType.RELU);
+		l8.setActivationType(ActivationType.RELU);
+		l9.setActivationType(ActivationType.NONE);
+		l3.setPoolingType(PoolingType.MAX);
+		l5.setPoolingType(PoolingType.AVER);
+		l7.setPoolingType(PoolingType.AVER);
+		l2.initializeWeights(0.0001f, 0.01f);
+		l4.initializeWeights(0.01f, 0.01f);
+		l6.initializeWeights(0.01f, 0.01f);
+
+		
+//		cnn.setInputShape(new int[] {28, 28});
+//		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
+		cnn.setInputShape(new int[] {32, 32});
+		String path = Paths.get(System.getProperty("user.dir"), "..", "..", "..","datasets", "CIFAR", "cifar-10-batches-bin").toString();
+		CIFAR10DataProvider tp = new CIFAR10DataProvider(path, batchSize, DatasetType.TRAINING_ALL, false);
+
+
+		
+		float[] tin = tp.getNextbatchInput();
+		float[] tout = tp.getNextBatchLabel();
+		
+		cnn.forwardPass(tin);		
+		cnn.backPropagation(tout, costType);
+		int i = 10;
+		System.out.printf(
+				"l2 weights %f gradient %f \n"
+				+ "l4 weights %f gradient %f \n"
+				+ "l6 weights %f gradient %f \n"
+				+ "l8 weights %f gradient %f \n"
+				+ "l9 weights %f gradient %f \n", 
+				l2.getWeight()[i], l2.getGradients()[i],
+				l4.getWeight()[i], l4.getGradients()[i],
+				l6.getWeight()[i], l6.getGradients()[i],
+				l8.getWeight()[i], l8.getGradients()[i],
+				l9.getWeight()[i], l9.getGradients()[i]
+				);
+		
+		Layer l = l2;
+		float g1 = l.getGradients()[i];
+		float[] weights = l.getWeight();
+		double w = weights[i];
+		double e = 0.001f;
+		weights[i] = (float) (w - e);
+		l.setWeight(weights);
+		cnn.forwardPass(tin);
+		cnn.calCostErr(tout, costType);
+		float c1 = cnn.getCost();
+		weights[i] = (float) (w + e);
+		l.setWeight(weights);
+		cnn.forwardPass(tin);
+		cnn.calCostErr(tout, costType);
+		float c2 = cnn.getCost();
+		double g2 = (c2 - c1)/(2 * e);
+		System.out.println(c1+" "+c2);
+		System.out.println(g1+" "+g2);
+		assertEquals(1, g2/g1, 0.0015);
+		cnn.releaseCLMem();
+//		OpenCL.releaseAll();
+	}	
+	
 	@Test
 	public void gradientCheckPadding() {
 //		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
@@ -341,8 +448,8 @@ public class TestCNN {
 		boolean addBias = true;
 		boolean useOpenCL = true;
 		boolean padding = true;
-		int costType = 1;
-		int batchSize = 2;
+		int costType = 0;
+		int batchSize = 1;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
@@ -369,14 +476,16 @@ public class TestCNN {
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
-		float c1 = cnn.getCost(tout, costType);
+		cnn.calCostErr(tout, costType);
+		float c1 = cnn.getCost();
 //		float[] a1 = l.getActivations();
 
 		weights[i] = (float) (w + e);
 		l.setWeight(weights);
 
 		cnn.forwardPass(tin);
-		float c2 = cnn.getCost(tout, costType);
+		cnn.calCostErr(tout, costType);
+		float c2 = cnn.getCost();
 		double g2 = (c2 - c1)/(2 * e);
 //		float[] a2 = l.getActivations();
 //		assertArrayEquals("!!",a1,a2, 0.0001f);

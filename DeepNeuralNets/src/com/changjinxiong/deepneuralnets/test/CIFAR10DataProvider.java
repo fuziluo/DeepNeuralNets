@@ -72,8 +72,7 @@ public class CIFAR10DataProvider implements DataProvider {
 	@Override
 	public float[] getNextbatchInput() {
 		int dataSize = 3 * 32 * 32;
-		int dataSizeWithBias = dataSize;
-		float[] result = new float[dataSizeWithBias * batchSize];
+		float[] result = new float[dataSize * batchSize];
 	    byte[] currentImage = new byte[dataSize];
 	    float[] currentLabel = new float[10 * batchSize];
 		for (int i = 0; i < batchSize; i++) {
@@ -86,8 +85,21 @@ public class CIFAR10DataProvider implements DataProvider {
 				currentLabel[i * 10 + label] = 1;
 				currentLabelsBatch = currentLabel;
 				datasets[currentDatasetNo].readFully(currentImage);
+				//******subtract image mean********
+//				int mean1 = 0, mean2 = 0, mean3 = 0;
+//				for (int j = 0; j < 1024; j++) {
+//					mean1 += currentImage[j];
+//					mean2 += currentImage[1024 + j];
+//					mean3 += currentImage[2048 + j];										
+//				}
+//				for (int j = 0; j < 1024; j++) {
+//					currentImage[j] -= mean1 / 1024;
+//					currentImage[1024 + j] -= mean2 / 1024;
+//					currentImage[2048 + j] -= mean3 / 1024;
+//				}
+				//***********************************
 				for (int j = 0; j < dataSize; j++) {
-					result[i * dataSizeWithBias + j] = (currentImage[j] & 0xFF)/255.0f;
+					result[i * dataSize + j] = (currentImage[j] & 0xFF);///255.0f;
 				}
 			} catch (IOException e) {
 					e.printStackTrace();

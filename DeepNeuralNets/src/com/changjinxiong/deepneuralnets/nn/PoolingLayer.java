@@ -1,5 +1,7 @@
 package com.changjinxiong.deepneuralnets.nn;
 
+import static com.changjinxiong.deepneuralnets.nn.Util.activationDerivFunc;
+import static com.changjinxiong.deepneuralnets.nn.Util.activationFunc;
 import static java.lang.Math.ceil;
 import static org.jocl.CL.*;
 
@@ -41,7 +43,8 @@ public class PoolingLayer implements FeatureMapLayer {
 	private float[] errors;
 	private cl_mem activationsCL;
 	private cl_mem prevErrorsCL;
-	private long[] localWorkSizeK0, localWorkSizeK1;	
+	private long[] localWorkSizeK0, localWorkSizeK1;
+	private ActivationType activationType;	
 	
 	public PoolingLayer(int poolHeight, int poolWidth, int stride, FeatureMapLayer previousLayer, Layer nextLayer, boolean useOpenCL) {
 		if (previousLayer == null) {
@@ -58,6 +61,7 @@ public class PoolingLayer implements FeatureMapLayer {
 		this.poolHeight = poolHeight;
 		this.poolWidth = poolWidth;
 		this.stride = stride;
+		this.activationType = ActivationType.NONE;
 	}
 	
 	@Override
@@ -128,8 +132,9 @@ public class PoolingLayer implements FeatureMapLayer {
 		cl_command_queue commandQueue = OpenCL.getCommandQueue();
 		cl_mem arg0 = nextLayer.getPrevErrorsCL();
 		cl_mem arg1 = previousLayer.getActivationsCL();
-		prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, batchSize * previousLayer.getNumOfNodes() * Sizeof.cl_float, null, null);
-		clEnqueueFillBuffer(commandQueue, prevErrorsCL, Pointer.to(new float[] {0}), 1, 0, batchSize * previousLayer.getNumOfNodes() * Sizeof.cl_float, 0, null, null );
+		long prevErrSize = 1l * batchSize * previousLayer.getNumOfNodes() * Sizeof.cl_float;
+		prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, prevErrSize, null, null);
+		clEnqueueFillBuffer(commandQueue, prevErrorsCL, Pointer.to(new float[] {0}), 1, 0, prevErrSize, 0, null, null );
 		cl_mem arg2 = prevErrorsCL;
 		clSetKernelArg(kernel1, 0, Sizeof.cl_mem, Pointer.to(arg0));
 		clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg1));
@@ -168,17 +173,17 @@ public class PoolingLayer implements FeatureMapLayer {
 			int offset, int rin, int cin) {
 		switch (poolingType) {
 		case AVER:
-			float err = 0;
-			int cnt = 0;
+//			int cnt = 0;
+//			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
+//				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
+//					cnt ++;
+//				}				
+//			}
 			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
 				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
-					err += error;
-					cnt ++;
-				}				
-			}
-			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
-				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
-					prevErrors[offset + i * inputFeatureMapsShape[1] + j] += err /cnt;
+//					prevErrors[offset + i * inputFeatureMapsShape[1] + j] += error /cnt;
+					float der = activationDerivFunc(previousLayer.getActivationType(), preAct[offset + i * inputFeatureMapsShape[1] + j]);
+					prevErrors[offset + i * inputFeatureMapsShape[1] + j] += error / (poolHeight * poolWidth) * der;
 				}
 			}
 
@@ -195,7 +200,8 @@ public class PoolingLayer implements FeatureMapLayer {
 					}
 				}				
 			}
-			prevErrors[offset + rMax * inputFeatureMapsShape[1] + cMax] += error;
+			float der = activationDerivFunc(previousLayer.getActivationType(), preAct[offset + rMax * inputFeatureMapsShape[1] + cMax]);
+			prevErrors[offset + rMax * inputFeatureMapsShape[1] + cMax] += error * der;
 			break;
 		default:
 			break;
@@ -263,14 +269,12 @@ public class PoolingLayer implements FeatureMapLayer {
 		float out = 0;
 		switch (poolingType) {
 		case AVER:
-			int cnt = 0;
 			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
 				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
 					out += preAct[offset + i * inputFeatureMapsShape[1] + j];
-					cnt++;
 				}				
 			}	
-			out /= cnt;
+			out /= poolHeight * poolWidth;
 			break;
 		case MAX:
 			out = preAct[offset + rin * inputFeatureMapsShape[1] + cin];
@@ -284,7 +288,7 @@ public class PoolingLayer implements FeatureMapLayer {
 			break;
 			
 		}
-		return out;
+		return activationFunc(activationType, out);
 	}
 	@Override
 	public Layer getPreviousLayer() {
@@ -405,9 +409,11 @@ public class PoolingLayer implements FeatureMapLayer {
 		int[] para = {
 				poolingType.getValue(), PoolingType.AVER.getValue(), PoolingType.MAX.getValue(), 
 				numOfFeatureMaps, inputFeatureMapsShape[0], inputFeatureMapsShape[1], outputFeatureMapsShape[0], outputFeatureMapsShape[1],
-				poolHeight, poolWidth, stride, batchSize
+				poolHeight, poolWidth, stride, batchSize,
+				activationType.getValue(), 
+				previousLayer.getActivationType() != null ? previousLayer.getActivationType().getValue() : 99
 		}; 
-		cl_program program = OpenCL.getProgram(LayerType.POOL, null, para);
+		cl_program program = OpenCL.getProgram(LayerType.POOL, para);
 		//kernel for forward pass
 	    kernel0 = clCreateKernel(program, "forwardPass", null); 
 		//for backprop
@@ -432,12 +438,12 @@ public class PoolingLayer implements FeatureMapLayer {
 
 	@Override
 	public void setActivationType(ActivationType type) {
-		throw new IllegalStateException("Not allowed to set activation type on pooling layer!");		
+		activationType = type;
 	}
 
 	@Override
 	public ActivationType getActivationType() {
-		return previousLayer.getActivationType();
+		return activationType;
 	}
 	@Override
 	public void releaseCLMem() {

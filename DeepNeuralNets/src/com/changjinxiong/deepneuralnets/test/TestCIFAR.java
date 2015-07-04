@@ -20,7 +20,9 @@ import javax.swing.JLabel;
 
 import org.junit.Test;
 
+import com.changjinxiong.deepneuralnets.nn.ConvolutionalLayer;
 import com.changjinxiong.deepneuralnets.nn.ConvolutionalNeuralNetwork;
+import com.changjinxiong.deepneuralnets.nn.FullyConnectedLayer;
 import com.changjinxiong.deepneuralnets.nn.Layer;
 import com.changjinxiong.deepneuralnets.nn.MultiLayerPerceptron;
 import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
@@ -65,9 +67,9 @@ public class TestCIFAR {
 			float[] floatPixels = cp.getNextbatchInput();
 			int[] pixels = new int[floatPixels.length] ;
 			for (int j = 0; j < pixels.length/3; j++) {
-				pixels[j * 3] = (int) (floatPixels[j] * 255);
-				pixels[j * 3 + 1] = (int) (floatPixels[pixels.length/3 + j] * 255);
-				pixels[j * 3 + 2] = (int) (floatPixels[2 * pixels.length/3 + j] * 255);
+				pixels[j * 3] = (int) (floatPixels[j]);
+				pixels[j * 3 + 1] = (int) (floatPixels[pixels.length/3 + j]);
+				pixels[j * 3 + 2] = (int) (floatPixels[2 * pixels.length/3 + j]);
 			}
 			
 			BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
@@ -165,7 +167,7 @@ public class TestCIFAR {
 		float weightDecay = 0;//0.01f;
 		int lrChangeCycle = 5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
 		float lrChangeRate = 0.33f;
-		int epoch = 10;
+		int epoch = 5;
 		int[][] cnnLayers = new int[][] {	{3, 0, 0 ,0}, 
 											{32, 5, 5, 1},
 											{2, 2, 2}, 
@@ -220,9 +222,9 @@ public class TestCIFAR {
 		cnn.test(TestSet);
 		
 		String path = "/home/jxchang/project/records/cifar/.cnn.weights";
-		cnn.loadWeights(path);
-
-		cnn.test(TestSet);
+//		cnn.loadWeights(path);
+//
+//		cnn.test(TestSet);
 		
 		
 		cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
@@ -232,7 +234,7 @@ public class TestCIFAR {
 		cnn.test(trainingSet);
 //		System.out.println("Test with test set...");
 		
-		cnn.saveWeights(path);
+//		cnn.saveWeights(path);
 
 		float errorRate = cnn.test(TestSet);
 		assertEquals(0, errorRate, 0.1);	
@@ -242,4 +244,112 @@ public class TestCIFAR {
 
 	}
 	
+	@Test
+	public void TrainCNNReLU() {
+		boolean useOpenCL = true;
+		boolean addBias = true;
+		boolean padding = true;
+		int batchSize = 100;
+		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
+		CIFAR10DataProvider TestSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TEST, false);
+		int costType = 0; 
+		float baselearningRate = 0.001f;
+		float momentum = 0.9f;
+		float weightDecay = 0;//0.4f;//0.01f;
+		int lrChangeCycle = 8 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
+		float lrChangeRate = 0.1f;
+		int epoch = 1;
+		int[][] cnnLayers = new int[][] {	{3, 0, 0 ,0}, 
+											{32, 5, 5, 1},
+											{3, 3, 2}, 
+											{32, 5, 5, 1},
+											{3, 3, 2}, 
+											{64, 5, 5, 1}, 
+											{3, 3, 2}, 
+											{64},
+											{10}
+											};
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
+		cnn.setInputShape(new int[] {32, 32});
+		Layer l1 = cnn.getInputLayer();
+		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
+		PoolingLayer l3 = (PoolingLayer) l2.getNextLayer();
+		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
+		PoolingLayer l5 = (PoolingLayer) l4.getNextLayer();
+		ConvolutionalLayer l6 = (ConvolutionalLayer) l5.getNextLayer();
+		PoolingLayer l7 = (PoolingLayer) l6.getNextLayer();
+		FullyConnectedLayer l8 = (FullyConnectedLayer) l7.getNextLayer();
+		FullyConnectedLayer l9 = (FullyConnectedLayer) l8.getNextLayer();
+		l2.setActivationType(ActivationType.RELU);
+		l4.setActivationType(ActivationType.RELU);
+		l6.setActivationType(ActivationType.RELU);
+		l8.setActivationType(ActivationType.RELU);
+		l9.setActivationType(ActivationType.NONE);
+		l3.setPoolingType(PoolingType.MAX);
+		l5.setPoolingType(PoolingType.AVER);
+		l7.setPoolingType(PoolingType.AVER);
+		l2.initializeWeights(0.0001f, 0);
+		l4.initializeWeights(0.01f, 0);
+		l6.initializeWeights(0.01f, 0);
+//		l8.initializeWeights(1f, 0.01f);
+//		l9.initializeWeights(1f, 0);
+		l2.setLearningRateMultiplication(0.001f);
+		l4.setLearningRateMultiplication(1);
+		l6.setLearningRateMultiplication(1);
+		l8.setLearningRateMultiplication(1);
+		l9.setLearningRateMultiplication(1);
+		
+		Logger logger = Logger.getLogger("CIFAR10 traing with CNN");
+		logger.log(Level.INFO, "CNN architecture: \n"
+				+ "{0} {1} bias \n"
+				+ "conv layer activation type: {2}\n"
+				+ "fully layer activation type: {3}"
+				, new Object[] {Arrays.deepToString(cnnLayers), addBias ? "with" : "without", ActivationType.RELU, ActivationType.RELU});
+
+		logger.log(Level.INFO, "Traning configuration: \n"
+				+ "useOpenCL = {0} \n"
+				+ "batchSize = {1} \n"
+				+ "costType = {2} \n"
+				+ "epoch = {3} \n"
+				+ "baselearningRate = {4} \n"
+				+ "momentum = {5} \n"
+				+ "weightDecay = {6} \n"
+				+ "lrChangeCycle = {7} \n"
+				+ "lrChangeRate = {8} \n", new Object[] {useOpenCL, batchSize, (costType==0?"CE":"MSE"), epoch, baselearningRate+"", momentum, weightDecay, lrChangeCycle, lrChangeRate});
+		String path = "/home/jxchang/project/records/cifar/.cnnReLU.weights";
+
+		
+//		System.out.println(Arrays.toString(l2.getWeight()));
+//		logger.log(Level.INFO, "Pretest before training...");
+//		cnn.test(TestSet);
+//		
+//		cnn.loadWeights(path);
+
+		cnn.test(TestSet);
+//		System.out.println(Arrays.toString(l2.getWeight()));
+//		System.out.println(Arrays.toString(l4.getWeight()));
+//		System.out.println(Arrays.toString(l6.getWeight()));
+//		System.out.println(Arrays.toString(l8.getWeight()));
+//		System.out.println(Arrays.toString(l9.getWeight()));
+		
+		
+		cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
+//		System.out.println(Arrays.toString(l2.getWeight()));
+
+
+		cnn.test(trainingSet);
+//		System.out.println("Test with test set...");
+		
+//		logger.log(Level.INFO, "Saving weights...");
+//		cnn.saveWeights(path);
+//		System.out.println(Arrays.toString(l2.getWeight()));
+//		System.out.println(Arrays.toString(l4.getWeight()));
+//		System.out.println(Arrays.toString(l6.getWeight()));
+//		System.out.println(Arrays.toString(l8.getWeight()));
+//		System.out.println(Arrays.toString(l9.getWeight()));
+
+		float errorRate = cnn.test(TestSet);
+		assertEquals(0, errorRate, 0.1);	
+
+	}
 }

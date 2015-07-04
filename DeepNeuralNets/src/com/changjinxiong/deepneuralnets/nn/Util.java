@@ -6,7 +6,7 @@ import static java.lang.Math.max;
 
 public class Util {
 	public enum ActivationType {
-		SIGMOID(0), RELU(1), TANH(2); //SOFTPLUS(3), //, MAXOUT(4);
+		SIGMOID(0), RELU(1), TANH(2), NONE(3); //SOFTPLUS(3), //, MAXOUT(4);
 	    private final int value;
 	    private ActivationType(int value) {
 	        this.value = value;
@@ -20,6 +20,9 @@ public class Util {
 	public static float activationFunc(ActivationType activationType, float input) {
 		float output = 0;
 		switch (activationType) {
+		case NONE:
+			output = input;
+			break;
 		case RELU:
 			output = max(0, input);
 			break;
@@ -40,6 +43,9 @@ public class Util {
 	public static  float activationDerivFunc(ActivationType activationType, float input) {
 		float output = 0;
 		switch (activationType) {
+		case NONE:
+			output = 1;
+			break;
 		case RELU:
 			output = input > 0 ? 1 : 0;
 			break;

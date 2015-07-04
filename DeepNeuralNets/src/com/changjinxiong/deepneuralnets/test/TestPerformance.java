@@ -20,10 +20,14 @@ import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 public class TestPerformance {
 
 	@Test
-	public void testMLPForward() {
-		int inputLayerSize = 13*13;
-		int hiddenLayerSize = 256*13*13;
-		int outputLayerSize = 4096;
+	public void testMLPTiming() {
+//		int inputLayerSize = 13*13;
+//		int hiddenLayerSize = 256*13*13;
+//		int outputLayerSize = 4096;
+//		int batchSize = 256;
+		int inputLayerSize = 4096;
+		int hiddenLayerSize = 4096;
+		int outputLayerSize = 1000;
 		int batchSize = 256;
 		boolean useOpenCL = true;
 		boolean addBias = true;
@@ -45,22 +49,26 @@ public class TestPerformance {
 	@Test
 	public void testCNNTiming() {
 		int numOfInputFeatureMaps = 3;
-		int numOfOutputFeatureMaps = 128;
-		int filterSize = 5;
-		int stride = 1;
-		int inputSize = 128;
+		int numOfOutputFeatureMaps = 96;
+		int filterSize = 11;
+		int stride = 4;
+		int inputSize = 224;
 		int[][] para = {{numOfInputFeatureMaps, 0, 0, 0}, 
 						{numOfOutputFeatureMaps, filterSize, filterSize, stride},
-						{2, 2},
-						{numOfOutputFeatureMaps, filterSize, filterSize, stride},
-						{2, 2},
-						{500},
-						{10}
+						{2, 2, 2},
+						{256, 5, 5, 1},
+						{2, 2, 2},
+						{384, 3, 3, 1},
+						{384, 3, 3, 1},
+						{256, 3, 3, 1},
+						{4096},
+						{4096},
+						{1000}
 				};
 		boolean addBias = true;
 		boolean useOpenCL = true;
-		boolean padding = false;
-		int batchSize = 32;
+		boolean padding = true;
+		int batchSize = 256;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
@@ -69,8 +77,9 @@ public class TestPerformance {
 		Layer l5 = l4.getNextLayer();
 		cnn.setInputShape(new int[] {inputSize, inputSize});		
 		float[] testInput = new float[batchSize * numOfInputFeatureMaps * inputSize * inputSize];
-		float[] testLabel = new float[batchSize * 10];
+		float[] testLabel = new float[batchSize * 1000];
 		cnn.forwardPass(testInput);
+		cnn.releaseCLMem();
 		System.out.println("**********Timing starting************");
 		long t = System.currentTimeMillis();
 		cnn.forwardPass(testInput);

@@ -11,8 +11,10 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.changjinxiong.deepneuralnets.test.IrisDataProvider;
+import com.changjinxiong.deepneuralnets.nn.Layer;
 import com.changjinxiong.deepneuralnets.nn.MultiLayerPerceptron;
 import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
+import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 
 public class TestIris {
 
@@ -74,7 +76,28 @@ public class TestIris {
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{4,33,3}, true, useOpenCL); //overfitting
 		int batchSize = 150;
 		IrisDataProvider tp = new IrisDataProvider(batchSize, false);
-		mlp.train(tp, costType, 0.5f, 0.0f, 0, 0, 0, 10000);
+		mlp.train(tp, costType, 0.05f, 0.0f, 0, 0, 0, 10000);
+		//test
+		IrisDataProvider tp1 = new IrisDataProvider(150, false);
+		float errorRate = mlp.test(tp1);
+		assertEquals(0, errorRate, 0.01);
+
+	}
+	
+	@Test
+	public void trainMLPReLU() {
+		boolean useOpenCL = false;
+		int costType = 0; //cross entropy
+		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{4,33,3}, true, useOpenCL); //overfitting
+		int batchSize = 150;
+		Layer l1 = mlp.getInputLayer();
+		Layer l2 = l1.getNextLayer();
+		Layer l3 = l2.getNextLayer();
+		l2.setActivationType(ActivationType.RELU);
+		l3.setActivationType(ActivationType.NONE);
+
+		IrisDataProvider tp = new IrisDataProvider(batchSize, false);
+		mlp.train(tp, costType, 0.01f, 0.0f, 0, 0, 0, 10000);
 		//test
 		IrisDataProvider tp1 = new IrisDataProvider(150, false);
 		float errorRate = mlp.test(tp1);

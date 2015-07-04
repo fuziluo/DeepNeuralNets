@@ -20,9 +20,9 @@ public interface NeuralNetwork {
 			int maxEpoch);
 	public float getCost();
 	
-	public float getCost(float[] labels, int costType);
+	public void calCostErr(float[] labels, int costType);
 
-	public void setError(float[] labels, int costType);
+//	public void setError(float[] labels, int costType);
 	
 	public void saveWeights(String path);
 	

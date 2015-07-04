@@ -100,7 +100,7 @@ public class TestMnist {
 //		mlp.test(mnistTest);
 		int costType = 0; //cross entropy
 		int epoch = 1;
-		float baselearningRate = 0.5f;
+		float baselearningRate = 0.05f;
 		float momentum = 0.9f;
 		float weightDecay = 0;
 		int lrChangeCycle = mnistTraining.getDatasetSize() / mnistTraining.getBatchSize();
@@ -222,11 +222,11 @@ public class TestMnist {
 		boolean useOpenCL = true;
 		boolean addBias = true;
 		boolean padding = false;
-		int batchSize = 20;
+		int batchSize = 50;
 		MnistDataProvider trainingSet = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
 		MnistDataProvider testSet = new MnistDataProvider("test/t10k-images-idx3-ubyte", "test/t10k-labels-idx1-ubyte", batchSize, false);
-		int costType = 1; //MSE
-		float baselearningRate = 0.005f;
+		int costType = 0; 
+		float baselearningRate = 0.02f;
 		float momentum = 0.9f;
 		float weightDecay = 0.001f;
 		int lrChangeCycle = 0;//5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
@@ -288,4 +288,134 @@ public class TestMnist {
 
 	}
 	
+	
+	@Test
+	public void trainCNNReLU() {
+		boolean useOpenCL = true;
+		boolean addBias = true;
+		boolean padding = false;
+		int batchSize = 1000;
+		MnistDataProvider trainingSet = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
+		MnistDataProvider testSet = new MnistDataProvider("test/t10k-images-idx3-ubyte", "test/t10k-labels-idx1-ubyte", batchSize, false);
+		int costType = 0;
+		float baselearningRate = 0.00003f;
+		float momentum = 0.9f;
+		float weightDecay = 0.005f;
+		int lrChangeCycle = 0;//5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
+		float lrChangeRate = 0.33f;
+		int epoch = 5;
+		int[][] cnnLayers = new int[][] {{1, 0, 0 ,0}, 
+										{20, 5, 5, 1},
+										{2, 2, 2}, 
+										{50, 5, 5, 1},
+										{2, 2, 2}, 
+										{500}, 
+										{10}
+										};
+		String path = "/home/jxchang/project/records/mnist/.cnnReLU.weights";
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
+		cnn.setInputShape(new int[] {28, 28});
+		Layer l1 = cnn.getInputLayer();
+		Layer l2 = l1.getNextLayer();
+		Layer l3 = l2.getNextLayer();
+		Layer l4 = l3.getNextLayer();
+		Layer l5 = l4.getNextLayer();
+		Layer l6 = l5.getNextLayer();
+		Layer l7 = l6.getNextLayer();
+		l2.setActivationType(ActivationType.RELU);
+		l4.setActivationType(ActivationType.RELU);
+		l6.setActivationType(ActivationType.RELU);
+		l7.setActivationType(ActivationType.NONE);
+		Logger logger = Logger.getLogger("MNIST traing with CNN");
+		logger.log(Level.INFO, "CNN architecture: \n"
+				+ "{0} {1} bias \n"
+				+ "conv layer activation type: {2}\n"
+				+ "fully layer activation type: {3}"
+				, new Object[] {Arrays.deepToString(cnnLayers), addBias ? "with" : "without", ActivationType.RELU, ActivationType.RELU});
+
+		logger.log(Level.INFO, "Traning configuration: \n"
+				+ "useOpenCL = {0} \n"
+				+ "padding = {1} \n"
+				+ "batchSize = {2} \n"
+				+ "costType = {3} \n"
+				+ "epoch = {4} \n"
+				+ "baselearningRate = {5} \n"
+				+ "momentum = {6} \n"
+				+ "weightDecay = {7} \n"
+				+ "lrChangeCycle = {8} \n"
+				+ "lrChangeRate = {9} \n", 
+				new Object[] {useOpenCL, padding,  batchSize, (costType==0?"CE":"MSE"), epoch, ""+baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate});
+
+		
+		logger.log(Level.INFO, "Pretest before training...");
+//		cnn.test(trainingSet);
+		cnn.test(testSet);
+
+		cnn.loadWeights(path);
+
+		cnn.test(testSet);
+	
+		cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
+
+		cnn.test(trainingSet);
+		
+//		logger.log(Level.INFO, "Saving weights...");
+//		cnn.saveWeights(path);
+		
+//		System.out.println("Test with test set...");
+		float errorRate = cnn.test(testSet);
+		assertEquals(0, errorRate, 0.03);	
+	}
+
+	@Test
+	public void trainMLPReLU() {
+		boolean useOpenCL = true;
+		boolean addBias = true;
+		int batchSize = 100;
+		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
+		MnistDataProvider mnistTest = new MnistDataProvider("test/t10k-images-idx3-ubyte", "test/t10k-labels-idx1-ubyte", 10000, false);
+		int[] mlpLayers = new int[]{784,300,10};
+		NeuralNetwork mlp = new MultiLayerPerceptron(mlpLayers, addBias, useOpenCL); 
+		Layer l2 = mlp.getInputLayer().getNextLayer();
+		Layer l3 = l2.getNextLayer();
+		l2.setActivationType(ActivationType.RELU);
+		l3.setActivationType(ActivationType.NONE);
+
+//		mlp.test(mnistTraining);
+//		mlp.test(mnistTest);
+		int costType = 0; //cross entropy
+		int epoch = 10;
+		float baselearningRate = 0.0001f;
+		float momentum = 0.9f;
+		float weightDecay = 0;
+		int lrChangeCycle = 3 * mnistTraining.getDatasetSize() / mnistTraining.getBatchSize();
+		float lrChangeRate = 0.8f;
+		Logger logger = Logger.getLogger("MNIST traing with MLP");
+		logger.log(Level.INFO, "MLP architecture: \n"
+				+ "{0} {1} bias \n", new Object[] {Arrays.toString(mlpLayers), addBias ? "with" : "without"});
+		logger.log(Level.INFO, "Traning configuration: \n"
+				+ "useOpenCL = {0} \n"
+				+ "batchSize = {1} \n"
+				+ "costType = {2} \n"
+				+ "epoch = {3} \n"
+				+ "baselearningRate = {4} \n"
+				+ "momentum = {5} \n"
+				+ "weightDecay = {6} \n"
+				+ "lrChangeCycle = {7} \n"
+				+ "lrChangeRate = {8} \n", new Object[] {useOpenCL, batchSize, (costType==0?"CE":"MSE"), epoch, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate});
+		
+		mlp.test(mnistTest);
+		logger.log(Level.INFO, "Training start...");
+		mlp.train(mnistTraining, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
+//		mlp.test(mnistTraining);
+//		System.out.println("Test with test set...");
+		float errorRate = mlp.test(mnistTest);
+		assertEquals(0, errorRate, 0.07);
+		
+		logger.log(Level.INFO, "Saving weights...");
+		String path = "/home/jxchang/project/records/mnist/.mlpReLU.weights";
+		mlp.saveWeights(path);
+		logger.log(Level.INFO, "Weights saved to " + path);
+
+	}
 }

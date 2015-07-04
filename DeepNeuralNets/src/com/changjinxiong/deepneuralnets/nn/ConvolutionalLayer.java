@@ -47,6 +47,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 
 	private cl_kernel kernel0, kernel1, kernel2, kernel3;
 	private long[] localWorkSizeK0, localWorkSizeK1, localWorkSizeK2, localWorkSizeK3;
+	private float lrMult = 1;
 
 	public ConvolutionalLayer(int numOfOutputFeatureMaps, int filterHeight, int filterWidth, int stride, 
 			FeatureMapLayer previousLayer, Layer nextLayer, boolean addBias, boolean useOpenCL) {
@@ -55,11 +56,14 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		this.numOfOutputFeatureMaps = numOfOutputFeatureMaps;
 		this.useOpenCL = useOpenCL;
 		this.padding = false; //TODO change default setting
+		this.addBias = addBias;
+		this.filterHeight = filterHeight;
+		this.filterWidth = filterWidth;
+		this.stride = stride;
 		if (previousLayer != null) {
 			this.numOfInputFeatureMaps = previousLayer.getNumOfFeatureMaps();
-			//the last element of each weight is bias.
-			this.weights = new float[numOfOutputFeatureMaps * (filterHeight * filterWidth + (addBias ? 1 : 0))];
-			initializeWeights(weights);
+//			initializeWeights(0.25f, 0);
+			initializeWeights();
 			this.gradients = new float[weights.length];
 			this.weightsUpdate = new float[weights.length];
 			//TODO change the default setting
@@ -67,7 +71,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			if (useOpenCL) {
 //				generateKernels();
 		        cl_context context = OpenCL.getContext();
-				weightsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
+//				weightsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
 				weightsUpdateCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weightsUpdate.length* Sizeof.cl_float, Pointer.to(weightsUpdate), null);
 //				gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, gradients.length* Sizeof.cl_float, Pointer.to(gradients), null);
 				gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY, gradients.length* Sizeof.cl_float, null, null);
@@ -85,10 +89,6 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			this.gradients = null;
 			this.weightsUpdate = null;
 		}
-		this.addBias = addBias;
-		this.filterHeight = filterHeight;
-		this.filterWidth = filterWidth;
-		this.stride = stride;
 
 
 	}
@@ -150,7 +150,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 				previousLayer.getActivationType() != null ? previousLayer.getActivationType().getValue() : 99,//FIXME
 				padding ? 1 : 0
 		}; 
-		cl_program program = OpenCL.getProgram(LayerType.CONV, ActivationType.SIGMOID, para);
+		cl_program program = OpenCL.getProgram(LayerType.CONV, para);
 		//kernel for forward pass
 	    kernel0 = clCreateKernel(program, "forwardPass", null); 
 		//for gradients
@@ -168,10 +168,37 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		localWorkSizeK3 = new long[] {128};
 	}
 
-	private void initializeWeights(float[] weights) {
+	private void initializeWeights() {
+		weights = new float[numOfOutputFeatureMaps * (filterHeight * filterWidth + (addBias ? 1 : 0))];
 		Random rnd = new Random(0);
 		for (int i = 0; i < weights.length; i++) {
 			weights[i] = rnd.nextFloat() - 0.5f;
+		}
+		if (useOpenCL) {
+			if (weightsCL != null) {
+				clReleaseMemObject(weightsCL);
+			}
+			weightsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
+		}
+	}
+
+	public void initializeWeights(float delta, float bias) {
+		weights = new float[numOfOutputFeatureMaps * (filterHeight * filterWidth + (addBias ? 1 : 0))];
+		Random rnd = new Random(0);
+		for (int i = 0; i < weights.length; i++) {
+//			weights[i] = (float) (rnd.nextGaussian() * delta / Math.sqrt(filterHeight * filterWidth / 2.0));
+			weights[i] = (float) (rnd.nextGaussian() * delta );
+		}
+		int weightsDim = (filterHeight * filterWidth + (addBias ? 1 : 0));
+		if (addBias) {
+			for (int i = 0; i < numOfOutputFeatureMaps; i++)
+			weights[i * weightsDim + filterHeight * filterWidth] = bias;
+		}
+		if (useOpenCL) {
+			if (weightsCL != null) {
+				clReleaseMemObject(weightsCL);
+			}
+			weightsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
 		}
 	}
 
@@ -274,7 +301,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			cl_mem arg0 = gradientsCL;
 			cl_mem arg1 = weightsCL;		
 			cl_mem arg2 = weightsUpdateCL;
-			float[] arg3 = new float[] {learningRate};
+			float[] arg3 = new float[] {learningRate  * lrMult};
 			float[] arg4 = new float[] {momentum};
 			float[] arg5 = new float[] {weightDecay / batchSize};
 			int[] arg6 = new int[] {weights.length};
@@ -291,8 +318,9 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	        clReleaseMemObject(gradientsCL);
 	        gradientsCL = null;
 		} else {
+			//TODO add support for different lr for bias
 			for (int i = 0; i < weights.length; i++) {
-				weightsUpdate[i] = momentum * weightsUpdate[i] - learningRate * gradients[i]  - learningRate * weightDecay * weights[i] / batchSize;
+				weightsUpdate[i] = momentum * weightsUpdate[i] - learningRate * lrMult * gradients[i]  - learningRate * weightDecay * weights[i] / batchSize;
 				weights[i] += weightsUpdate[i];
 				gradients[i] = 0;
 			}
@@ -766,5 +794,12 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			clReleaseMemObject(prevErrorsCL);
 			prevErrorsCL = null;
 		}
+	}
+	
+	public void setLearningRateMultiplication(float lrMult) {
+		if (lrMult <= 0) {
+			throw new IllegalArgumentException("Learning Rate Multiplication should be positive");
+		}
+		this.lrMult  = lrMult;		
 	}
 }
