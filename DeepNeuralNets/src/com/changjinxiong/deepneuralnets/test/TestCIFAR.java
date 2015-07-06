@@ -93,7 +93,7 @@ public class TestCIFAR {
 				}
 			}  
 
-//			System.out.printf("%d %s \n%s \n", pixels.length,Arrays.toString(pixels),Arrays.toString(label));           
+			System.out.printf("%d %s \n%s \n", pixels.length,Arrays.toString(pixels),Arrays.toString(label));           
     		try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
@@ -161,13 +161,13 @@ public class TestCIFAR {
 		int batchSize = 100;
 		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
 		CIFAR10DataProvider TestSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TEST, false);
-		int costType = 1; 
-		float baselearningRate = 0.003f;
+		int costType = 0; 
+		float baselearningRate = 0.005f;
 		float momentum = 0.9f;
 		float weightDecay = 0;//0.01f;
 		int lrChangeCycle = 5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
 		float lrChangeRate = 0.33f;
-		int epoch = 5;
+		int epoch = 1;
 		int[][] cnnLayers = new int[][] {	{3, 0, 0 ,0}, 
 											{32, 5, 5, 1},
 											{2, 2, 2}, 
@@ -253,12 +253,12 @@ public class TestCIFAR {
 		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
 		CIFAR10DataProvider TestSet = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TEST, false);
 		int costType = 0; 
-		float baselearningRate = 0.001f;
+		float baselearningRate = 0.00001f;
 		float momentum = 0.9f;
-		float weightDecay = 0;//0.4f;//0.01f;
-		int lrChangeCycle = 8 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
+		float weightDecay = 0.04f;//0.4f;//0.01f;
+		int lrChangeCycle = 5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
 		float lrChangeRate = 0.1f;
-		int epoch = 1;
+		int epoch = 10;
 		int[][] cnnLayers = new int[][] {	{3, 0, 0 ,0}, 
 											{32, 5, 5, 1},
 											{3, 3, 2}, 
@@ -283,21 +283,34 @@ public class TestCIFAR {
 		l2.setActivationType(ActivationType.RELU);
 		l4.setActivationType(ActivationType.RELU);
 		l6.setActivationType(ActivationType.RELU);
-		l8.setActivationType(ActivationType.RELU);
+		l8.setActivationType(ActivationType.NONE);
 		l9.setActivationType(ActivationType.NONE);
 		l3.setPoolingType(PoolingType.MAX);
 		l5.setPoolingType(PoolingType.AVER);
 		l7.setPoolingType(PoolingType.AVER);
+//		l2.initializeWeights(0.1f, 0.01f);
+//		l4.initializeWeights(0.1f, 0.01f);
+//		l6.initializeWeights(0.1f, 0.01f);
+//		l8.initializeWeights(0.01f, 0.01f);
+//		l9.initializeWeights(0.01f, 0.01f);
+		
 		l2.initializeWeights(0.0001f, 0);
-		l4.initializeWeights(0.01f, 0);
+		l4.initializeWeights(0.01f, 0f);
 		l6.initializeWeights(0.01f, 0);
+		l8.initializeWeights(0.1f, 0);
+		l9.initializeWeights(0.1f, 0);
+		
+//		l2.initializeWeights(1f, 0.01f);
+//		l4.initializeWeights(1f, 0.01f);
+//		l6.initializeWeights(1f, 0.01f);
 //		l8.initializeWeights(1f, 0.01f);
-//		l9.initializeWeights(1f, 0);
-		l2.setLearningRateMultiplication(0.001f);
-		l4.setLearningRateMultiplication(1);
-		l6.setLearningRateMultiplication(1);
-		l8.setLearningRateMultiplication(1);
-		l9.setLearningRateMultiplication(1);
+//		l9.initializeWeights(1f, 0.01f);
+		
+//		l2.setLearningRateMultiplication(0.01f);
+//		l4.setLearningRateMultiplication(1);
+//		l6.setLearningRateMultiplication(10);
+//		l8.setLearningRateMultiplication(10);
+//		l9.setLearningRateMultiplication(100);
 		
 		Logger logger = Logger.getLogger("CIFAR10 traing with CNN");
 		logger.log(Level.INFO, "CNN architecture: \n"
@@ -320,10 +333,10 @@ public class TestCIFAR {
 
 		
 //		System.out.println(Arrays.toString(l2.getWeight()));
-//		logger.log(Level.INFO, "Pretest before training...");
-//		cnn.test(TestSet);
-//		
-//		cnn.loadWeights(path);
+		logger.log(Level.INFO, "Pretest before training...");
+		cnn.test(TestSet);
+		
+		cnn.loadWeights(path);
 
 		cnn.test(TestSet);
 //		System.out.println(Arrays.toString(l2.getWeight()));
@@ -340,8 +353,8 @@ public class TestCIFAR {
 		cnn.test(trainingSet);
 //		System.out.println("Test with test set...");
 		
-//		logger.log(Level.INFO, "Saving weights...");
-//		cnn.saveWeights(path);
+		logger.log(Level.INFO, "Saving weights...");
+		cnn.saveWeights(path);
 //		System.out.println(Arrays.toString(l2.getWeight()));
 //		System.out.println(Arrays.toString(l4.getWeight()));
 //		System.out.println(Arrays.toString(l6.getWeight()));

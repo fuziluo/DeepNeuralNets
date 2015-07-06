@@ -48,6 +48,8 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	private cl_kernel kernel0, kernel1, kernel2, kernel3;
 	private long[] localWorkSizeK0, localWorkSizeK1, localWorkSizeK2, localWorkSizeK3;
 	private float lrMult = 1;
+	private boolean paraChanged = false;
+	private float lrBiasMult = 2;
 
 	public ConvolutionalLayer(int numOfOutputFeatureMaps, int filterHeight, int filterWidth, int stride, 
 			FeatureMapLayer previousLayer, Layer nextLayer, boolean addBias, boolean useOpenCL) {
@@ -169,7 +171,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	}
 
 	private void initializeWeights() {
-		weights = new float[numOfOutputFeatureMaps * (filterHeight * filterWidth + (addBias ? 1 : 0))];
+		weights = new float[numOfOutputFeatureMaps * numOfInputFeatureMaps * (filterHeight * filterWidth + (addBias ? 1 : 0))];
 		Random rnd = new Random(0);
 		for (int i = 0; i < weights.length; i++) {
 			weights[i] = rnd.nextFloat() - 0.5f;
@@ -183,16 +185,18 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	}
 
 	public void initializeWeights(float delta, float bias) {
-		weights = new float[numOfOutputFeatureMaps * (filterHeight * filterWidth + (addBias ? 1 : 0))];
+		weights = new float[numOfOutputFeatureMaps * numOfInputFeatureMaps * (filterHeight * filterWidth + (addBias ? 1 : 0))];
 		Random rnd = new Random(0);
 		for (int i = 0; i < weights.length; i++) {
-//			weights[i] = (float) (rnd.nextGaussian() * delta / Math.sqrt(filterHeight * filterWidth / 2.0));
+//			weights[i] = (float) (rnd.nextGaussian() / Math.sqrt(filterHeight * filterWidth * numOfInputFeatureMaps/ 2.0));
 			weights[i] = (float) (rnd.nextGaussian() * delta );
+//			weights[i] = (float) ((rnd.nextGaussian() + 1.96f) * delta);
+
 		}
 		int weightsDim = (filterHeight * filterWidth + (addBias ? 1 : 0));
 		if (addBias) {
-			for (int i = 0; i < numOfOutputFeatureMaps; i++)
-			weights[i * weightsDim + filterHeight * filterWidth] = bias;
+			for (int i = filterHeight * filterWidth; i < weights.length; i += weightsDim)
+				weights[i] = bias;
 		}
 		if (useOpenCL) {
 			if (weightsCL != null) {
@@ -231,7 +235,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		int[] newShape = previousLayer.getOutputFeatureMapsShapes();
 		if (inputFeatureMapsShape == null || inputFeatureMapsShape[0] != newShape[0] || inputFeatureMapsShape[1] != newShape[1]){
 			inputFeatureMapsShape = newShape;
-		
+			paraChanged  = true;
 			//calculating output feature map size from input feature map size
 			int h = 0, w = 0;
 			if (inputFeatureMapsShape[0] >= filterHeight && inputFeatureMapsShape[1] >= filterWidth) {
@@ -245,17 +249,17 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 				}
 			}
 			outputFeatureMapsShape = new int[] {h, w};
-			if (useOpenCL) {
-				generateKernels();
-			}
+//			if (useOpenCL) {
+//				generateKernels();
+//			}
 		}
 	}
 	
 	@Override
 	public int[] getOutputFeatureMapsShapes() {
-		if (previousLayer != null) { 
-			updateFeatureMapsShapes();
-		}
+//		if (previousLayer != null) { 
+//			updateFeatureMapsShapes();
+//		}
 		return outputFeatureMapsShape;
 	}
 
@@ -319,8 +323,16 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	        gradientsCL = null;
 		} else {
 			//TODO add support for different lr for bias
+			float lr, decay;
 			for (int i = 0; i < weights.length; i++) {
-				weightsUpdate[i] = momentum * weightsUpdate[i] - learningRate * lrMult * gradients[i]  - learningRate * weightDecay * weights[i] / batchSize;
+				if (addBias && i % (filterWidth * filterHeight + (addBias ? 1 : 0)) == filterWidth * filterHeight ) {
+			        lr = lrBiasMult * learningRate;
+			        decay = 0;
+			    } else {
+			    	lr = learningRate;
+			        decay = weightDecay;
+			    }
+				weightsUpdate[i] = momentum * weightsUpdate[i] - lr * lrMult * gradients[i]  - lr * decay * weights[i] / batchSize;
 				weights[i] += weightsUpdate[i];
 				gradients[i] = 0;
 			}
@@ -357,6 +369,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			int batchOffsetOut = i * numOfOutputFeatureMaps * outputFeatureMapSize;
 			for (int j = 0; j < numOfOutputFeatureMaps; j++) {
 				int featureMapOffsetOut = batchOffsetOut + j * outputFeatureMapSize;
+				int weightsOffsetOut = j * weightsDim * numOfInputFeatureMaps;
 				for (int row = 0, col = 0; col + filterWidth <= inputFeatureMapsShape[1] + (padding ? filterWidth - 1 : 0); row += stride) {
 					if (row + filterHeight > inputFeatureMapsShape[0] + (padding ? filterHeight - 1 : 0)) {
 						col += stride;
@@ -367,25 +380,26 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 					int colIndOut = col / stride;
 					for (int k = 0; k < numOfInputFeatureMaps; k++) {
 						int featureMapOffsetIn = batchOffsetIn + k * inputFeatureMapSize;
+						int weightsOffsetIn = weightsOffsetOut + k * weightsDim;
 						/****************************************/
 						for (int m = 0; m < weightsDim - 1; m++) {
 							int rowIndIn = m / filterWidth + row;
 							int colIndIn = m % filterWidth + col;
 //							System.out.printf("! %d %d %d   \n",featureMapOffsetOut,rowIndOut,colIndOut);
 							if (rowIndIn < inputFeatureMapsShape[0] && colIndIn < inputFeatureMapsShape[1]) {
-								gradients[j *  weightsDim + m] += errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] * 
-									inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] / batchSize;
+								gradients[weightsOffsetIn + m] += errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] * 
+									inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn];
 							}
 						}
 						if (!addBias) { 
 							int rowIndIn = (weightsDim - 1) / filterWidth + row;
 							int colIndIn = (weightsDim - 1) % filterWidth + col;
 							if (rowIndIn < inputFeatureMapsShape[0] && colIndIn < inputFeatureMapsShape[1]) {
-								gradients[j *  weightsDim + weightsDim - 1] += errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] * 
-									inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] / batchSize;
+								gradients[weightsOffsetIn + weightsDim - 1] += errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] * 
+									inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn];
 							}
 						} else { //for the last weight, aka bias
-							gradients[j *  weightsDim + weightsDim - 1] += errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] / batchSize;
+							gradients[weightsOffsetIn + weightsDim - 1] += errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut];
 						}	
 						/****************************************/
 					}
@@ -405,6 +419,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			int batchOffsetOut = i * numOfOutputFeatureMaps * outputFeatureMapSize;
 			for (int j = 0; j < numOfOutputFeatureMaps; j++) {
 				int featureMapOffsetOut = batchOffsetOut + j * outputFeatureMapSize;
+				int weightsOffsetOut = j * weightsDim * numOfInputFeatureMaps;
 				for (int row = 0, col = 0; col + filterWidth <= inputFeatureMapsShape[1] + (padding ? filterWidth - 1 : 0); row += stride) {
 					if (row + filterHeight > inputFeatureMapsShape[0] + (padding ? filterHeight - 1 : 0)) {
 						col += stride;
@@ -415,6 +430,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 					int colIndOut = col / stride;
 					for (int k = 0; k < numOfInputFeatureMaps; k++) {
 						int featureMapOffsetIn = batchOffsetIn + k * inputFeatureMapSize;
+						int weightsOffsetIn = weightsOffsetOut + k * weightsDim;
 						/****************************************/
 						for (int m = 0; m < filterHeight * filterWidth; m++) {
 							int rowIndIn = m / filterWidth + row;
@@ -423,7 +439,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 								float prevAct = inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn];
 								float der = activationDerivFunc(previousLayer.getActivationType(), prevAct); 
 								prevErrors[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] += 	
-										weights[j *  weightsDim + m] * errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] * der;
+										weights[weightsOffsetIn + m] * errors[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] * der;
 							}
 						}
 						
@@ -466,11 +482,23 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		//for the kernel using global mem as buffer
 //		cl_mem arg3 = clCreateBuffer(context, CL_MEM_HOST_NO_ACCESS, gradients.length*batchSize* Sizeof.cl_float, null, null);
 //		clSetKernelArg(kernel1, 3, Sizeof.cl_mem, Pointer.to(arg3));
-		long[] globalWorkSize = {(long) ceil(weightsDim * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
-						(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1],
-						(long) ceil(batchSize * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
-						
+//		long[] globalWorkSize = {(long) ceil(weightsDim * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
+//						(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1],
+//						(long) ceil(batchSize * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
+//						
+//		};
+		
+//		long[] globalWorkSize = {(long) ceil(weightsDim * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
+//				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1],
+//				(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
+//				
+//		};
+		long[] globalWorkSize = {(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
+				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1],
+				(long) ceil(batchSize * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
+				
 		};
+		
 		clEnqueueNDRangeKernel(commandQueue, kernel1, 3, null, globalWorkSize, localWorkSizeK1, 0, null, null);		
 		clFinish(commandQueue);
 //		clReleaseMemObject(arg3);
@@ -559,13 +587,16 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		if (previousLayer == null) { //input layer
 			throw new IllegalStateException("No forward pass calculation on input layer!");
 		}
-		updateFeatureMapsShapes();
+//		updateFeatureMapsShapes();
 		int newBatchSize = previousLayer.getBatchSize();
 		if (batchSize != newBatchSize) { 
 			batchSize = newBatchSize; //update batch size
-			if (useOpenCL) {
-				generateKernels();
-			}
+			paraChanged = true;
+			
+		}
+		if (useOpenCL && paraChanged) {
+			generateKernels();
+			paraChanged = false;
 		}
 //		System.out.println(batchSize +" "+ numOfOutputFeatureMaps * outputFeatureMapsShape[0] * outputFeatureMapsShape[1]);
 		if (useOpenCL) {
@@ -619,6 +650,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			int batchOffsetOut = i * (numOfOutputFeatureMaps * outputFeatureMapSize);
 			for (int j = 0; j < numOfOutputFeatureMaps; j++) {
 				int featureMapOffsetOut = batchOffsetOut + j * outputFeatureMapSize;
+				int weightsOffsetOut = j * weightsDim * numOfInputFeatureMaps;
 				for (int row = 0, col = 0; col + filterWidth <= inputFeatureMapsShape[1] + (padding ? filterWidth - 1 : 0); row += stride) {
 					if (row + filterHeight > inputFeatureMapsShape[0] + (padding ? filterHeight - 1 : 0)) {
 						col += stride;
@@ -629,13 +661,14 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 					int colIndOut = col / stride;
 					for (int k = 0; k < numOfInputFeatureMaps; k++) {
 						int featureMapOffsetIn = batchOffsetIn + k * inputFeatureMapSize;
+						int weightsOffsetIn = weightsOffsetOut + k * weightsDim;
 						for (int m = 0; m < weightsDim - 1; m++) {
 							int rowIndIn = m / filterWidth + row;
 							int colIndIn = m % filterWidth + col;
 							//the handling of convolution here is simply weighted sum, considering the order of weights is reversed.
 							if (rowIndIn < inputFeatureMapsShape[0] && colIndIn < inputFeatureMapsShape[1]) {
 								activations[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] += 
-									inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] * weights[j *  weightsDim + m];
+									inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] * weights[weightsOffsetIn + m];
 							}
 						}
 						if (!addBias) { 
@@ -643,10 +676,10 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 							int colIndIn = (weightsDim - 1) % filterWidth + col;
 							if (rowIndIn < inputFeatureMapsShape[0] && colIndIn < inputFeatureMapsShape[1]) {
 								activations[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] += 
-										inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] * weights[j *  weightsDim + weightsDim - 1];
+										inputFeatureMaps[featureMapOffsetIn + rowIndIn * inputFeatureMapsShape[1] + colIndIn] * weights[weightsOffsetIn + weightsDim - 1];
 							}
 						} else { 
-							activations[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] += weights[j *  weightsDim + weightsDim - 1];
+							activations[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] += weights[weightsOffsetIn + weightsDim - 1];
 						}			
 					}
 					activations[featureMapOffsetOut + rowIndOut * outputFeatureMapsShape[1] + colIndOut] = 
@@ -698,23 +731,29 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 
 	@Override
 	public void setInputShape(int[] inputShape) {
-		if (previousLayer != null) { //not input layer
-			throw new IllegalStateException("only allow to set batch size on input layer!");
-		}
+//		if (previousLayer != null) { //not input layer
+//			throw new IllegalStateException("only allow to set batch size on input layer!");
+//		}
 		if (inputShape.length != 2) {
 			throw new IllegalArgumentException("Convolutional layer has 2 shape parameters for input!");
 		}
-		outputFeatureMapsShape = new int[2];
-		outputFeatureMapsShape[0] = inputShape[0];
-		outputFeatureMapsShape[1] = inputShape[1];
-		
+		if (previousLayer == null) {
+			outputFeatureMapsShape = new int[2];
+			outputFeatureMapsShape[0] = inputShape[0];
+			outputFeatureMapsShape[1] = inputShape[1];
+		} else {
+			updateFeatureMapsShapes();
+		}
+		if (nextLayer != null && nextLayer instanceof FeatureMapLayer) {
+			((FeatureMapLayer) nextLayer).setInputShape(outputFeatureMapsShape);
+		}
 	}
 
 	@Override
 	public int getNumOfNodes() {
-		if (outputFeatureMapsShape == null) {
-			updateFeatureMapsShapes();
-		}
+//		if (outputFeatureMapsShape == null) {
+//			updateFeatureMapsShapes();
+//		}
 		int height = outputFeatureMapsShape[0];
 		int width = outputFeatureMapsShape[1];
 		return numOfOutputFeatureMaps * (height * width);

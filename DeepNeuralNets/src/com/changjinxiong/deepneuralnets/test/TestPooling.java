@@ -20,29 +20,29 @@ public class TestPooling {
 
 	@Test
 	public void testBackpropagation() {
-//		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2}, {10}};
 		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {2, 2, 1}, {10}};
 		boolean addBias = true;
-		boolean useOpenCL = true;
+		boolean useOpenCL = false;
 		boolean padding = true;
-		int batchSize = 100;
+		int batchSize = 20;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
-		Layer l2 = l1.getNextLayer();
-		Layer l3 = l2.getNextLayer();
+		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
+		ConvolutionalLayer l3 = (ConvolutionalLayer) l2.getNextLayer();
 		PoolingLayer l4 = (PoolingLayer) l3.getNextLayer();
-		Layer l5 = l4.getNextLayer();
-		
-		l2.setActivationType(ActivationType.SIGMOID);
-		l3.setActivationType(ActivationType.SIGMOID);
-		l4.setActivationType(ActivationType.NONE);
-		l5.setActivationType(ActivationType.SIGMOID);
-
-//		l4.setPoolingType(PoolingType.AVER);
-		
-//		cnn.setInputShape(new int[] {28, 28});
-//		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
+		FullyConnectedLayer l5 = (FullyConnectedLayer) l4.getNextLayer();
 		cnn.setInputShape(new int[] {32, 32});
+		l2.initializeWeights(0.005f, 0);
+		l3.initializeWeights(0.5f, 0);
+		l5.initializeWeights(0.5f, 0);
+		
+//		l2.setActivationType(ActivationType.SIGMOID);
+//		l3.setActivationType(ActivationType.SIGMOID);
+//		l4.setActivationType(ActivationType.SIGMOID);
+//		l5.setActivationType(ActivationType.SIGMOID);
+
+		l4.setPoolingType(PoolingType.AVER);
+		
 		CIFAR10DataProvider tp = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", batchSize, DatasetType.TRAINING_ALL, false);
 
 		
@@ -50,20 +50,19 @@ public class TestPooling {
 		float[] tout = tp.getNextBatchLabel();
 		cnn.forwardPass(tin);
 		cnn.backPropagation(tout, 0);
-		int i = 1;
-		Layer l = l3;
+		int i = 0;
+		Layer l = l2;
 		float g1 = l.getGradients()[i];
 //		System.out.println(Arrays.toString(l.getGradients()));
 //		System.out.println(Arrays.toString(l4.getPrevErrors()));
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.01f;
+		double e = 0.0005f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
 		cnn.calCostErr(tout, 0);
 		float c1 = cnn.getCost();
-//		float[] a1 = l.getActivations();
 
 		weights[i] = (float) (w + e);
 		l.setWeight(weights);
@@ -87,13 +86,18 @@ public class TestPooling {
 		boolean addBias = true;
 		boolean useOpenCL = true;
 		boolean padding = true;
-		int batchSize = 100;
+		int batchSize = 20;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
-		Layer l2 = l1.getNextLayer();
-		Layer l3 = l2.getNextLayer();
+		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
+		ConvolutionalLayer l3 = (ConvolutionalLayer) l2.getNextLayer();
 		PoolingLayer l4 = (PoolingLayer) l3.getNextLayer();
-		l4.setPoolingType(PoolingType.MAX);
+		FullyConnectedLayer l5 = (FullyConnectedLayer) l4.getNextLayer();
+		cnn.setInputShape(new int[] {32, 32});
+		l2.initializeWeights(0.005f, 0);
+		l3.initializeWeights(0.5f, 0);
+		l5.initializeWeights(0.5f, 0);
+		l4.setPoolingType(PoolingType.AVER);
 		
 //		cnn.setInputShape(new int[] {28, 28});
 //		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
@@ -112,7 +116,7 @@ public class TestPooling {
 //		System.out.println(Arrays.toString(l4.getPrevErrors()));
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.002f;
+		double e = 0.001f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
@@ -231,14 +235,14 @@ public class TestPooling {
 		
 		poolingLayer.forwardPass();
 		float[] results1 = poolingLayer.getActivations();
-		System.out.println(Arrays.toString(results));
+		System.out.println(Arrays.toString(results1));
 		assertArrayEquals("!!",outputs1,results1, 0);		
 	}
 	
 	@Test
 	public void testForwardPassStride() {
 		boolean addBias = false;
-		boolean useOpenCL = true;
+		boolean useOpenCL = false;
 		int numOfFeatureMaps = 2;
 		int poolHeight = 2;
 		int poolWidth = 2;
@@ -438,28 +442,28 @@ public class TestPooling {
 				1, 2, 3, 8, 5,
 		};
 		float[] outputs1 = {
-				3.25f, 3.5f, 4f,
-				1.5f, 3.5f, 5f,
-				1.5f, 5.5f, 5f,
+				3.25f, 3.5f, 2f,
+				1.5f, 3.5f, 2.5f,
+				0.75f, 2.75f, 1.25f,
 
-				3.25f, 3.5f, 4f,
-				1.5f, 3.5f, 5f,
-				1.5f, 5.5f, 5f,
+				3.25f, 3.5f, 2f,
+				1.5f, 3.5f, 2.5f,
+				0.75f, 2.75f, 1.25f,
 
-				3.25f, 3.5f, 4f,
-				1.5f, 3.5f, 5f,
-				1.5f, 5.5f, 5f,
+				3.25f, 3.5f, 2f,
+				1.5f, 3.5f, 2.5f,
+				0.75f, 2.75f, 1.25f,
 
-				3.25f, 3.5f, 4f,
-				1.5f, 3.5f, 5f,
-				1.5f, 5.5f, 5f,
+				3.25f, 3.5f, 2f,
+				1.5f, 3.5f, 2.5f,
+				0.75f, 2.75f, 1.25f,
 		};
 		inputLayer.setInputShape(inputShape1);
 		inputLayer.setInputs(inputs1);
 		
 		poolingLayer.forwardPass();
 		float[] results1 = poolingLayer.getActivations();
-		System.out.println(Arrays.toString(results));
+		System.out.println(Arrays.toString(results1));
 		assertArrayEquals("!!",outputs1,results1, 0);	
 	
 	}
@@ -530,6 +534,7 @@ public class TestPooling {
 		poolingLayer.forwardPass();
 		float[] results = poolingLayer.getActivations();
 		System.out.println(Arrays.toString(results));
+		poolingLayer.releaseCLMem();
 		assertArrayEquals("!!",outputs,results, 0);
 	
 		int[] inputShape1 = {5, 5};
@@ -560,7 +565,7 @@ public class TestPooling {
 		
 		poolingLayer.forwardPass();
 		float[] results1 = poolingLayer.getActivations();
-		System.out.println(Arrays.toString(results));
+		System.out.println(Arrays.toString(results1));
 		assertArrayEquals("!!",outputs1,results1, 0);		
 	}
 	@Test
@@ -608,6 +613,7 @@ public class TestPooling {
 		poolingLayer.forwardPass();
 		float[] results = poolingLayer.getActivations();
 		System.out.println(Arrays.toString(results));
+		poolingLayer.releaseCLMem();
 		assertArrayEquals("!!",outputs,results, 0);
 	
 		int[] inputShape1 = {5, 5};
@@ -637,21 +643,21 @@ public class TestPooling {
 				1, 2, 3, 8, 5,
 		};
 		float[] outputs1 = {
-				3.25f, 3.5f, 4f,
-				1.5f, 3.5f, 5f,
-				1.5f, 5.5f, 5f,
-	
-				3.25f, 3.5f, 4f,
-				1.5f, 3.5f, 5f,
-				1.5f, 5.5f, 5f,
-	
-				3.25f, 3.5f, 4f,
-				1.5f, 3.5f, 5f,
-				1.5f, 5.5f, 5f,
-	
-				3.25f, 3.5f, 4f,
-				1.5f, 3.5f, 5f,
-				1.5f, 5.5f, 5f,
+				3.25f, 3.5f, 2f,
+				1.5f, 3.5f, 2.5f,
+				0.75f, 2.75f, 1.25f,
+
+				3.25f, 3.5f, 2f,
+				1.5f, 3.5f, 2.5f,
+				0.75f, 2.75f, 1.25f,
+
+				3.25f, 3.5f, 2f,
+				1.5f, 3.5f, 2.5f,
+				0.75f, 2.75f, 1.25f,
+
+				3.25f, 3.5f, 2f,
+				1.5f, 3.5f, 2.5f,
+				0.75f, 2.75f, 1.25f,
 	
 		};
 		inputLayer.setInputShape(inputShape1);
@@ -660,6 +666,7 @@ public class TestPooling {
 		poolingLayer.forwardPass();
 		float[] results1 = poolingLayer.getActivations();
 		System.out.println(Arrays.toString(results));
+		poolingLayer.releaseCLMem();
 		assertArrayEquals("!!",outputs1,results1, 0);	
 	
 	}

@@ -86,12 +86,12 @@ public class CIFAR10DataProvider implements DataProvider {
 				currentLabelsBatch = currentLabel;
 				datasets[currentDatasetNo].readFully(currentImage);
 				//******subtract image mean********
-//				int mean1 = 0, mean2 = 0, mean3 = 0;
-//				for (int j = 0; j < 1024; j++) {
-//					mean1 += currentImage[j];
-//					mean2 += currentImage[1024 + j];
-//					mean3 += currentImage[2048 + j];										
-//				}
+				float mean1 = 0, mean2 = 0, mean3 = 0;
+				for (int j = 0; j < 1024; j++) {
+					mean1 += currentImage[j] & 0xFF;
+					mean2 += currentImage[1024 + j] & 0xFF;
+					mean3 += currentImage[2048 + j] & 0xFF;										
+				}
 //				for (int j = 0; j < 1024; j++) {
 //					currentImage[j] -= mean1 / 1024;
 //					currentImage[1024 + j] -= mean2 / 1024;
@@ -99,15 +99,20 @@ public class CIFAR10DataProvider implements DataProvider {
 //				}
 				//***********************************
 				for (int j = 0; j < dataSize; j++) {
-					result[i * dataSize + j] = (currentImage[j] & 0xFF);///255.0f;
+					if (j < 1024)
+						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean1 / 1024;
+					else if (j < 2048)
+						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean2 / 1024;
+					else if (j < 3072)
+						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean3 / 1024;
 				}
+//				for (int j = 0; j < dataSize; j++) {
+//					result[i * dataSize + j] = (currentImage[j] & 0xFF);///256.0f;
+//				}
 			} catch (IOException e) {
 					e.printStackTrace();
 			}
 
-//			if (bias) { //bias node is always 1
-//				result[i * dataSizeWithBias + dataSize] = 1;
-//			}
 			currentIndex ++;
 			if (currentIndex >= datasetSize) {
 				if (random) {

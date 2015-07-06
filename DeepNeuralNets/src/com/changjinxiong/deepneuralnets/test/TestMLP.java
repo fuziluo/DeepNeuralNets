@@ -217,7 +217,7 @@ public class TestMLP {
 		Layer l = l2;
 		float g1 = l.getGradients()[i];
 		double w = l.getWeight()[i];
-		double e = 0.005f;
+		double e = 0.06f;
 		float[] tempW = l.getWeight();
 		tempW[i] = (float) (w - e);
 		l.setWeight(tempW);

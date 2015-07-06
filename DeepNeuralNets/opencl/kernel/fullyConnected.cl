@@ -1,9 +1,8 @@
 //  #define groupSize 8
 #define min(x,y)    ((x) < (y) ? (x) : (y))
-
 #define max(x,y)    ((x) > (y) ? (x) : (y))
 float activationFunction(float input) {
-  float output = 0;
+  float output = input;
   switch (activationType) {
   case NONE:
     output = input;
@@ -23,9 +22,8 @@ float activationFunction(float input) {
   }
   return output;
 }
-
 float derivative(float input) {
-  float output = 0;
+  float output = 1;
   switch (prevActivationType) {
   case NONE:
     output = 1;
@@ -153,13 +151,13 @@ __kernel void backCalcGradients(__global float *error, __global float *preActiva
           barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
         }
         if (weightsDim >= lid1 + j + 1 && numOfPerceptrons >= lid0 + i + 1) {
-          gradients[(lid0 + i) * weightsDim + (lid1 + j)] = private_C[0][0] / batchSize;
+          gradients[(lid0 + i) * weightsDim + (lid1 + j)] = private_C[0][0];
           if (weightsDim >= lid1 + j + groupSize_k1_N + 1)
-            gradients[(lid0 + i) * weightsDim + (lid1 + j + groupSize_k1_N)] = private_C[0][1] / batchSize;
+            gradients[(lid0 + i) * weightsDim + (lid1 + j + groupSize_k1_N)] = private_C[0][1];
           if (numOfPerceptrons >= lid0 + i + groupSize_k1_M + 1) {
-            gradients[(lid0 + i + groupSize_k1_M) * weightsDim + (lid1 + j)] = private_C[1][0] / batchSize;
+            gradients[(lid0 + i + groupSize_k1_M) * weightsDim + (lid1 + j)] = private_C[1][0];
             if (weightsDim >= lid1 + j + groupSize_k1_N + 1)
-              gradients[(lid0 + i + groupSize_k1_M) * weightsDim + (lid1 + j + groupSize_k1_N)] = private_C[1][1] / batchSize;
+              gradients[(lid0 + i + groupSize_k1_M) * weightsDim + (lid1 + j + groupSize_k1_N)] = private_C[1][1];
           }
         }
         barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
@@ -236,14 +234,17 @@ __kernel void updateWeights(__global float *gradients, __global float *weights, 
     float private_weightsUpdate[1];
 
     float lr = learningRate;
+    float decay = weightDecay_batchSize;
 
     for (int c0 = 128 * b0; c0 < len; c0 += 32768) {
-      if (weightsDim != prevActDim && (c0 + t0) % weightsDim == prevActDim )
+      if ((c0 + t0) % weightsDim == prevActDim ) {
         lr = 2 * learningRate;
+        decay = 0;
+      }
       if (len >= t0 + c0 + 1) {
         private_weights[0] = weights[t0 + c0];
         private_weightsUpdate[0] = weightsUpdate[t0 + c0];
-        private_weightsUpdate[0] = (((momentum * private_weightsUpdate[0]) - (lr * gradients[t0 + c0])) - ((lr * weightDecay_batchSize) * private_weights[0]));
+        private_weightsUpdate[0] = (((momentum * private_weightsUpdate[0]) - (lr * gradients[t0 + c0] )) - ((lr * decay) * private_weights[0]));
         private_weights[0] += private_weightsUpdate[0];
         weightsUpdate[t0 + c0] = private_weightsUpdate[0];
         weights[t0 + c0] = private_weights[0];

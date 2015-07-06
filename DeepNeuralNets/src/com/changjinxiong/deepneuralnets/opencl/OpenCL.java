@@ -224,6 +224,8 @@ public final class OpenCL {
 				fileContent = "#define batchSize " + para[11] + "\n" + fileContent;
 				fileContent = "#define activationType " + para[12] + "\n" + fileContent;
 				fileContent = "#define prevActivationType " + para[13] + "\n" + fileContent;
+//				System.out.println(fileContent);
+
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -302,8 +304,13 @@ public final class OpenCL {
 								};
 			groupSize = new int[] {
 					8, 4, 2,
-					6, 10, 1,
+					4, 4, 4,
 					8, 8, 1,
+					};
+			groupSize = new int[] {
+					8, 4, 2,
+					4, 4, 4,
+					8, 8, 4,
 					};
 		}
 

@@ -228,8 +228,8 @@ public class TestMnist {
 		int costType = 0; 
 		float baselearningRate = 0.02f;
 		float momentum = 0.9f;
-		float weightDecay = 0.001f;
-		int lrChangeCycle = 0;//5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
+		float weightDecay = 0;//0.001f;
+		int lrChangeCycle = 5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
 		float lrChangeRate = 0.33f;
 		int epoch = 5;
 		int[][] cnnLayers = new int[][] {{1, 0, 0 ,0}, {20, 5, 5, 1},{2, 2, 2}, {50, 5, 5, 1},{2, 2, 2}, {500}, {10}};
@@ -243,10 +243,10 @@ public class TestMnist {
 		Layer l5 = l4.getNextLayer();
 		Layer l6 = l5.getNextLayer();
 		Layer l7 = l6.getNextLayer();
-		l2.setActivationType(ActivationType.TANH);
-		l4.setActivationType(ActivationType.TANH);
-		l6.setActivationType(ActivationType.TANH);
-		l7.setActivationType(ActivationType.TANH);
+		l2.setActivationType(ActivationType.SIGMOID);
+		l4.setActivationType(ActivationType.SIGMOID);
+		l6.setActivationType(ActivationType.SIGMOID);
+		l7.setActivationType(ActivationType.SIGMOID);
 		Logger logger = Logger.getLogger("MNIST traing with CNN");
 		logger.log(Level.INFO, "CNN architecture: \n"
 				+ "{0} {1} bias \n"
@@ -280,11 +280,12 @@ public class TestMnist {
 
 		cnn.test(trainingSet);
 //		System.out.println("Test with test set...");
+		logger.log(Level.INFO, "Saving weights...");
+		cnn.saveWeights(path);
+
 		float errorRate = cnn.test(testSet);
 		assertEquals(0, errorRate, 0.03);	
 		
-		logger.log(Level.INFO, "Saving weights...");
-		cnn.saveWeights(path);
 
 	}
 	

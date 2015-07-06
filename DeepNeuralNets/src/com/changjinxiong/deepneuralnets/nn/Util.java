@@ -18,7 +18,7 @@ public class Util {
 	public enum LayerType {FULLY, CONV, POOL}
 	
 	public static float activationFunc(ActivationType activationType, float input) {
-		float output = 0;
+		float output = input;
 		switch (activationType) {
 		case NONE:
 			output = input;
@@ -41,7 +41,7 @@ public class Util {
 		return output;
 	}
 	public static  float activationDerivFunc(ActivationType activationType, float input) {
-		float output = 0;
+		float output = 1;
 		switch (activationType) {
 		case NONE:
 			output = 1;

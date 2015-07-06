@@ -55,9 +55,9 @@ public class TestPerformance {
 		int inputSize = 224;
 		int[][] para = {{numOfInputFeatureMaps, 0, 0, 0}, 
 						{numOfOutputFeatureMaps, filterSize, filterSize, stride},
-						{2, 2, 2},
+						{3, 3, 2},
 						{256, 5, 5, 1},
-						{2, 2, 2},
+						{3, 3, 2},
 						{384, 3, 3, 1},
 						{384, 3, 3, 1},
 						{256, 3, 3, 1},
@@ -94,7 +94,7 @@ public class TestPerformance {
 	@Test
 	public void testCNNTiming1() {
 		boolean useOpenCL = true;
-		boolean padding = false;
+		boolean padding = true;
 		boolean addBias = true;
 		int batchSize = 6000;
 		MnistDataProvider trainingSet = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);

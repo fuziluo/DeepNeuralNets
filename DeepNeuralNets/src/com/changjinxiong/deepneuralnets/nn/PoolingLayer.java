@@ -45,6 +45,7 @@ public class PoolingLayer implements FeatureMapLayer {
 	private cl_mem prevErrorsCL;
 	private long[] localWorkSizeK0, localWorkSizeK1;
 	private ActivationType activationType;	
+	private boolean paraChanged = false;
 	
 	public PoolingLayer(int poolHeight, int poolWidth, int stride, FeatureMapLayer previousLayer, Layer nextLayer, boolean useOpenCL) {
 		if (previousLayer == null) {
@@ -216,8 +217,16 @@ public class PoolingLayer implements FeatureMapLayer {
 
 	@Override
 	public void forwardPass() {
-		batchSize = previousLayer.getBatchSize(); //update batch size
-		updateFeatureMapsShapes();
+		int newbatchSize = previousLayer.getBatchSize(); //update batch size
+		if (newbatchSize != batchSize) {
+			batchSize = newbatchSize;
+			paraChanged = true;
+		}
+		if (useOpenCL && paraChanged) {
+			generateKernels();
+			paraChanged = false;
+		}
+
 		if (useOpenCL) {
 			forwardPassOpenCL();
 		} else {
@@ -350,9 +359,9 @@ public class PoolingLayer implements FeatureMapLayer {
 
 	@Override
 	public int getNumOfNodes() {
-		if (outputFeatureMapsShape == null) {
-			updateFeatureMapsShapes();
-		}
+//		if (outputFeatureMapsShape == null) {
+//			updateFeatureMapsShapes();
+//		}
 		int height = outputFeatureMapsShape[0];
 		int width = outputFeatureMapsShape[1];
 		return numOfFeatureMaps * (height * width);
@@ -377,26 +386,26 @@ public class PoolingLayer implements FeatureMapLayer {
 		return outputFeatureMapsShape;
 	}
 
-	private void updateFeatureMapsShapes() {
-		int[] newShape = previousLayer.getOutputFeatureMapsShapes();
-		if (inputFeatureMapsShape == null || inputFeatureMapsShape[0] != newShape[0] || inputFeatureMapsShape[1] != newShape[1]){
-			inputFeatureMapsShape = newShape;
-		
-			//calculating output feature map size from input feature map size
-			int h = 0, w = 0;
-			if (inputFeatureMapsShape[0] >= poolHeight && inputFeatureMapsShape[1] >= poolWidth) {
-				h = (inputFeatureMapsShape[0] - 1) / stride + 1;
-				w = (inputFeatureMapsShape[1] - 1) / stride + 1;
-	
-//				h = (inputFeatureMapsShape[0] - poolHeight) / stride + 1;
-//				w = (inputFeatureMapsShape[1] - poolWidth) / stride + 1;
-			}			
-			outputFeatureMapsShape = new int[] {h, w};
-			if (useOpenCL) {
-				generateKernels();
-			}
-		}
-	}
+//	private void updateFeatureMapsShapes() {
+//		int[] newShape = previousLayer.getOutputFeatureMapsShapes();
+//		if (inputFeatureMapsShape == null || inputFeatureMapsShape[0] != newShape[0] || inputFeatureMapsShape[1] != newShape[1]){
+//			inputFeatureMapsShape = newShape;
+//		
+//			//calculating output feature map size from input feature map size
+//			int h = 0, w = 0;
+//			if (inputFeatureMapsShape[0] >= poolHeight && inputFeatureMapsShape[1] >= poolWidth) {
+//				h = (inputFeatureMapsShape[0] - 1) / stride + 1;
+//				w = (inputFeatureMapsShape[1] - 1) / stride + 1;
+//	
+////				h = (inputFeatureMapsShape[0] - poolHeight) / stride + 1;
+////				w = (inputFeatureMapsShape[1] - poolWidth) / stride + 1;
+//			}			
+//			outputFeatureMapsShape = new int[] {h, w};
+//			if (useOpenCL) {
+//				generateKernels();
+//			}
+//		}
+//	}
 
 	private void generateKernels() {
 		if (kernel0 != null) {
@@ -432,8 +441,29 @@ public class PoolingLayer implements FeatureMapLayer {
 
 	@Override
 	public void setInputShape(int[] inputShape) {
-		throw new IllegalStateException("Not allowed to set input shape on pooling layer!");
+		if (inputShape.length != 2) {
+			throw new IllegalArgumentException("input shape should be 2d");
+		}
+
+		if (inputFeatureMapsShape == null || inputFeatureMapsShape[0] != inputShape[0] || inputFeatureMapsShape[1] != inputShape[1]){
+			inputFeatureMapsShape = inputShape;
+			paraChanged = true;
+			//calculating output feature map size from input feature map size
+			int h = 0, w = 0;
+			if (inputFeatureMapsShape[0] >= poolHeight && inputFeatureMapsShape[1] >= poolWidth) {
+				h = (inputFeatureMapsShape[0] - 1) / stride + 1;
+				w = (inputFeatureMapsShape[1] - 1) / stride + 1;
+	
+//					h = (inputFeatureMapsShape[0] - poolHeight) / stride + 1;
+//					w = (inputFeatureMapsShape[1] - poolWidth) / stride + 1;
+			}			
+			outputFeatureMapsShape = new int[] {h, w};
+
+		}
 		
+		if (nextLayer != null && nextLayer instanceof FeatureMapLayer) {
+			((FeatureMapLayer) nextLayer).setInputShape(outputFeatureMapsShape);
+		}
 	}
 
 	@Override

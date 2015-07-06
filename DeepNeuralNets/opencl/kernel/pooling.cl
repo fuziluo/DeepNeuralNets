@@ -2,7 +2,7 @@
 #define min(x,y)    ((x) < (y) ? (x) : (y))
 #define max(x,y)    ((x) > (y) ? (x) : (y))
 float activationFunction(float input) {
-  float output = 0;
+  float output = input;
   switch (activationType) {
   case NONE:
     output = input;
@@ -23,7 +23,7 @@ float activationFunction(float input) {
   return output;
 }
 float derivative(float input) {
-  float output = 0;
+  float output = 1;
   switch (prevActivationType) {
   case NONE:
     output = 1;

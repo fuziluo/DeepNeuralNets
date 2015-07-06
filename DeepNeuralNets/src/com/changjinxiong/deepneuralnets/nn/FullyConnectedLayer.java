@@ -44,6 +44,8 @@ public class FullyConnectedLayer implements Layer{
 	
 	private cl_kernel kernel0, kernel2, kernel1, kernel3;
 	private long[] localWorkSizeK0, localWorkSizeK1, localWorkSizeK2, localWorkSizeK3;
+	private boolean paraChanged = false;
+	private float lrBiasMult = 2;
 	
 	public FullyConnectedLayer(int numOfPerceptron, Layer previousLayer, Layer nextLayer, boolean addBias, boolean useOpenCL) {
 		this.addBias = addBias;
@@ -60,8 +62,8 @@ public class FullyConnectedLayer implements Layer{
 			//only fully connected layer has fixed input size at this time
 			if (previousLayer instanceof FullyConnectedLayer) {
 				//randomly initialize weights
-				initializeWeights(0.01f, 0);
-//				initializeWeights();
+//				initializeWeights(0.01f, 0);
+				initializeWeights();
 				gradients = new float[weights.length];
 				weightsUpdate = new float[weights.length];
 				//TODO change the default setting
@@ -169,7 +171,7 @@ public class FullyConnectedLayer implements Layer{
 		weights = new float[numOfPerceptron * weightLength];
 		Random rnd = new Random(0);
 		for (int i = 0; i < weights.length; i++) {
-			weights[i] = (rnd.nextFloat() - 0.5f);
+			weights[i] = rnd.nextFloat() - 0.5f;
 		}
 		if (useOpenCL) {
 			if (weightsCL != null) {
@@ -184,11 +186,13 @@ public class FullyConnectedLayer implements Layer{
 		weights = new float[numOfPerceptron * weightLength];
 		Random rnd = new Random(0);
 		for (int i = 0; i < weights.length; i++) {
-//			weights[i] = (float) (rnd.nextGaussian() * delta / Math.sqrt(previousLayer.getNumOfNodes() / 2.0));
+//			weights[i] = (float) (rnd.nextGaussian() / Math.sqrt(previousLayer.getNumOfNodes() / 2.0));
 			weights[i] = (float) (rnd.nextGaussian() * delta);
+//			weights[i] = (float) ((rnd.nextGaussian() + 1.96f) * delta);
 		}
 		if (addBias) {
-			weights[weights.length - 1] = bias;
+			for (int i = previousLayer.getNumOfNodes(); i < weights.length; i += previousLayer.getNumOfNodes() + 1)
+				weights[i] = bias;		
 		}
 		if (useOpenCL) {
 			if (weightsCL != null) {
@@ -267,7 +271,6 @@ public class FullyConnectedLayer implements Layer{
 		if (previousLayer == null) {
 			throw new IllegalStateException("No gradients on input layer!");
 		}	
-		//FIXME sometimes get wrong..
 		if (useOpenCL) {
 			clEnqueueReadBuffer(OpenCL.getCommandQueue(), gradientsCL, CL_TRUE, 0, gradients.length * Sizeof.cl_float, Pointer.to(gradients), 0, null, null);
 		}
@@ -294,27 +297,36 @@ public class FullyConnectedLayer implements Layer{
 		//In the case when previous layer is a feature map, the size of output is unknown until input is fed
 		if (weights == null) {
 			//randomly initialize weights
-			initializeWeights(0.01f, 0);
-//			initializeWeights();
+//			initializeWeights(0.01f, 0);
+			initializeWeights();
+			paraChanged = true;
+		}
+		if (gradients == null) {
 			gradients = new float[weights.length];
+			if (useOpenCL) {
+//				gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, gradients.length* Sizeof.cl_float, Pointer.to(gradients), null);
+				gradientsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY, gradients.length* Sizeof.cl_float, null, null);
+			}
+		}
+		if (weightsUpdate == null) {
 			weightsUpdate = new float[weights.length];
 			if (useOpenCL) {
-				generateKernels();
-		        cl_context context = OpenCL.getContext();
-//				weightsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
-				weightsUpdateCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weightsUpdate.length* Sizeof.cl_float, Pointer.to(weightsUpdate), null);
-//				gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, gradients.length* Sizeof.cl_float, Pointer.to(gradients), null);
-				gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY, gradients.length* Sizeof.cl_float, null, null);
+				weightsUpdateCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weightsUpdate.length* Sizeof.cl_float, Pointer.to(weightsUpdate), null);
 			}
 		}
 		
+
 		int newBatchSize = previousLayer.getBatchSize();
 		if (newBatchSize != batchSize) {
 			batchSize = newBatchSize; //update batch size
-			if (useOpenCL) {
-				generateKernels();
-			}
+			paraChanged = true;
 		}
+		
+		if (useOpenCL && paraChanged ) {
+			generateKernels();
+			paraChanged = false;
+		}
+		
 
 
 		if (useOpenCL) {
@@ -476,7 +488,7 @@ public class FullyConnectedLayer implements Layer{
 		cl_mem arg11 = previousLayer.getActivationsCL();
 //		cl_mem arg11 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, previousLayer.getActivations().length* Sizeof.cl_float, Pointer.to(previousLayer.getActivations()), null);
 		if (gradientsCL == null) {
-			gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, gradients.length* Sizeof.cl_float, null, null);
+			gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, weights.length* Sizeof.cl_float, null, null);
 		}
 		cl_mem arg12 = gradientsCL;
 //		cl_mem arg12 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, gradients.length* Sizeof.cl_float, null, null);
@@ -563,9 +575,9 @@ public class FullyConnectedLayer implements Layer{
 			for (int k = 0; k < batchSize; k++) {
 				for (int j = 0; j < weightsDim; j++) {
 					if (addBias && j == weightsDim - 1)
-						gradients[i * weightsDim + j] += errors[k * numOfPerceptron + i] / batchSize;
+						gradients[i * weightsDim + j] += errors[k * numOfPerceptron + i];
 					else
-						gradients[i * weightsDim + j] += errors[k * numOfPerceptron + i] * previousLayer.getActivations()[k * prevActivationDim + j] / batchSize;
+						gradients[i * weightsDim + j] += errors[k * numOfPerceptron + i] * previousLayer.getActivations()[k * prevActivationDim + j];
 				}
 			}
 		}	
@@ -622,8 +634,15 @@ public class FullyConnectedLayer implements Layer{
 	        gradientsCL = null;
 		} else {
 			//TODO add support for different lr for bias
-
+			float lr, decay;
 			for (int i = 0; i < weights.length; i++) {
+				if (addBias && i % (previousLayer.getNumOfNodes() + (addBias ? 1 : 0)) == previousLayer.getNumOfNodes() ) {
+			        lr = lrBiasMult  * learningRate;
+			        decay = 0;
+			    } else {
+			    	lr = learningRate;
+			        decay = weightDecay;
+			    }
 				weightsUpdate[i] = momentum * weightsUpdate[i] - learningRate * lrMult * gradients[i]  - learningRate * weightDecay * weights[i] / batchSize;
 				weights[i] += weightsUpdate[i];
 				gradients[i] = 0;

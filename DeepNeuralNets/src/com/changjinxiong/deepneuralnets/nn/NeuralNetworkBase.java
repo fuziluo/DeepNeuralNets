@@ -69,22 +69,30 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		Layer currentLayer = outputLayer;
 		while (currentLayer.getPreviousLayer() != null) {
 			t = System.currentTimeMillis();
-//			if(currentLayer.getPreviousLayer().getPreviousLayer() == null) {
-//				System.out.println("prev activations "+currentLayer.getPreviousLayer().getActivations().length+Arrays.toString(Arrays.copyOf(currentLayer.getPreviousLayer().getActivations(), 1000)));
-//			}
+
 
 			currentLayer.backpropagation();
-//			if (currentLayer.getGradients() != null) {
-//				System.out.println("gradients: "+currentLayer.getClass().getSimpleName()+currentLayer.getGradients().length+Arrays.toString(Arrays.copyOf(currentLayer.getGradients(), 100)));
-//				System.out.println("weights: "+currentLayer.getClass().getSimpleName()+currentLayer.getWeight().length+Arrays.toString(Arrays.copyOf(currentLayer.getWeight(), 100)));
+			if (currentLayer.getGradients() != null) {
+//				System.out.println("gradients: "+currentLayer.getClass().getSimpleName()+currentLayer.getGradients().length+Arrays.toString(Arrays.copyOf(currentLayer.getGradients(), Math.min(3000, currentLayer.getGradients().length))));
+//				System.out.println();
+//				System.out.println("weights: "+currentLayer.getClass().getSimpleName()+currentLayer.getWeight().length+Arrays.toString(Arrays.copyOf(currentLayer.getWeight(), 500)));
+//				System.out.println();
+			}
+//			if(currentLayer.getPreviousLayer().getPreviousLayer() == null) {
+//				System.out.println("prev activations "+currentLayer.getClass().getSimpleName()+currentLayer.getPreviousLayer().getActivations().length+Arrays.toString(Arrays.copyOf(currentLayer.getPreviousLayer().getActivations(), 500)));
+//				System.out.println();
 //			}
-//			if(currentLayer.getPreviousLayer().getPreviousLayer() != null)
-//				System.out.println("prevErr: " + currentLayer.getClass().getSimpleName()+currentLayer.getPrevErrors().length+Arrays.toString(Arrays.copyOf(currentLayer.getPrevErrors(), 1000)));
+//			System.out.println("*****"+currentLayer.getPreviousLayer().getClass().getSimpleName()+"******\n");
+			if(currentLayer.getPreviousLayer().getPreviousLayer() != null) {
+//				System.out.println("err: " + currentLayer.getPreviousLayer().getClass().getSimpleName()+currentLayer.getPrevErrors().length+Arrays.toString(Arrays.copyOf(currentLayer.getPrevErrors(), 500)));
+//				System.out.println();
+			}
+
 //			System.out.printf("  back %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
 			currentLayer = currentLayer.getPreviousLayer();
 		}		
 		currentLayer.releaseCLMem();
-//		System.out.println();
+//		
 	}
 	
 //	@Override
@@ -281,9 +289,12 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			backPropagation(batchLabels, costType);
 			
 			averageCost += cost;
+//			System.out.println(cost);
 			j++;
 			k++;
-			if (k >= dp.getDatasetSize() / dp.getBatchSize()) {
+			int displyCycle = dp.getDatasetSize() / dp.getBatchSize();
+//			displyCycle = 100;
+			if (k >= displyCycle) {
 				averageCost /= k;
 				LOGGER.log(Level.INFO, "Average cost over last {0} batches is {1}", new Object[] {k, ""+averageCost});
 //				System.out.printf("Average cost over last %d batches is %.5f\n", k, averageCost);
@@ -298,7 +309,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 				lrDecayTimes++;
 			}
 			updateWeights(lr, momentum, weightDecay);	
-//			if(i >= 1) break;
+//			if(i >= 0) break;
 		} 
 		releaseCLMem();
 		LOGGER.log(Level.INFO, "Training finished");
@@ -337,7 +348,8 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			break;
 		
 		}
-//		System.out.println("error"+Arrays.toString(error));
+		
+//		System.out.println("error "+Arrays.toString(Arrays.copyOf(error, 500)));
 		outputLayer.setErrors(error); 
 	}
 
@@ -397,7 +409,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		cost /= batchSize;
 		for (int j = 0; j < batchSize; j++) {
 			for (int i = 0; i < labelSize; i++) {
-				error[j * labelSize + i] *= activationDerivFunc(outputLayer.getActivationType(), error[j * labelSize + i]);
+				error[j * labelSize + i] *= activationDerivFunc(outputLayer.getActivationType(), activations[j * labelSize + i]) / batchSize;
 			}
 		}		
 	}
@@ -415,7 +427,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 //					cost -= (2 * labels[j * labelSize + i]) * log(1 + activations[j * labelSize + i]) + 
 //							(2 - 2 * labels[j * labelSize + i]) * log(1 - activations[j * labelSize + i]);
 
-					error[j * labelSize + i] = (activations[j * labelSize + i] - 2 * labels[j * labelSize + i] + 1) * 0.5f;
+					error[j * labelSize + i] = (activations[j * labelSize + i] - 2 * labels[j * labelSize + i] + 1) * 0.5f / batchSize;
 
 				}
 			}
@@ -428,7 +440,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 					cost += 0.5*pow(2 * labels[j * labelSize + i] - activations[j * labelSize + i] - 1, 2);
 					
 					error[j * labelSize + i] = (activations[j * labelSize + i] - 2 * labels[j * labelSize + i] + 1);
-					error[j * labelSize + i] *= (1 - activations[j * labelSize + i] * activations[j * labelSize + i]) / 2;
+					error[j * labelSize + i] *= (1 - activations[j * labelSize + i] * activations[j * labelSize + i]) / 2 / batchSize;
 				}
 			}			
 		} else {
@@ -455,7 +467,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 					 * m is the number of samples. 
 					 ************************************************/
 					cost -= (labels[j * labelSize + i] == 1) ? log(activations[j * labelSize + i]) : log(1 - activations[j * labelSize + i]);
-					error[j * labelSize + i] = (-labels[j * labelSize + i] + activations[j * labelSize + i]);
+					error[j * labelSize + i] = (-labels[j * labelSize + i] + activations[j * labelSize + i]) / batchSize;
 				}
 			}
 		} else if (costType == 1) {
@@ -466,7 +478,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 					 ************************************************/
 					cost += 0.5*pow(labels[j * labelSize + i] - activations[j * labelSize + i], 2);
 					error[j * labelSize + i] = (-labels[j * labelSize + i] + activations[j * labelSize + i]);
-					error[j * labelSize + i] *= activations[j * labelSize + i] * (1 - activations[j * labelSize + i]);
+					error[j * labelSize + i] *= activations[j * labelSize + i] * (1 - activations[j * labelSize + i]) / batchSize;
 				}
 			}			
 		} else {
