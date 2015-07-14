@@ -8,6 +8,7 @@ import java.util.logging.Logger;
 
 import org.junit.Test;
 
+import com.changjinxiong.deepneuralnets.nn.ConvolutionalLayer;
 import com.changjinxiong.deepneuralnets.nn.ConvolutionalNeuralNetwork;
 import com.changjinxiong.deepneuralnets.nn.FeatureMapLayer;
 import com.changjinxiong.deepneuralnets.nn.Layer;
@@ -16,6 +17,7 @@ import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
 import com.changjinxiong.deepneuralnets.nn.PoolingLayer;
 import com.changjinxiong.deepneuralnets.nn.PoolingLayer.PoolingType;
 import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
+import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 
 public class TestPerformance {
 
@@ -94,7 +96,7 @@ public class TestPerformance {
 	@Test
 	public void testCNNTiming1() {
 		boolean useOpenCL = true;
-		boolean padding = true;
+		boolean padding = false;
 		boolean addBias = true;
 		int batchSize = 6000;
 		MnistDataProvider trainingSet = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
@@ -125,6 +127,63 @@ public class TestPerformance {
 	
 		cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
 
-		
 	}
+	
+	
+	@Test
+	public void testWorkGroupSizeBackGradients() {
+		int numOfInputFeatureMaps = 128;
+		int numOfOutputFeatureMaps = 128;
+		int filterSize = 5;
+		int stride = 1;
+		int inputSize = 50;
+		int labelSize = 100;
+		int[][] para = {{numOfInputFeatureMaps, 0, 0, 0}, 
+						{numOfOutputFeatureMaps, filterSize, filterSize, stride},
+						{numOfOutputFeatureMaps, filterSize, filterSize, stride},
+						{labelSize}
+				};
+		boolean addBias = true;
+		boolean useOpenCL = true;
+		boolean padding = true;
+		int batchSize = 128;
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
+		Layer l1 = cnn.getInputLayer();
+		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
+		ConvolutionalLayer l3 = (ConvolutionalLayer) l2.getNextLayer();
+		cnn.setInputShape(new int[] {inputSize, inputSize});		
+		float[] testInput = new float[batchSize * numOfInputFeatureMaps * inputSize * inputSize];
+		float[] testLabel = new float[batchSize * labelSize];
+		cnn.forwardPass(testInput);
+		cnn.releaseCLMem();
+
+		System.out.println("Network: "+Arrays.deepToString(para));
+		System.out.println("batch size: "+batchSize);
+		
+		int[] grouSize = new int[] {
+				4, 4, 4,
+				1, 16, 4,
+				1, 1, 64,
+		};
+		for (grouSize[6] = 1; grouSize[6] <= 256; grouSize[6] *= 2) {
+			for (grouSize[7] = 1; grouSize[7] <= 256 / grouSize[6]; grouSize[7] *= 2) {
+//				for (grouSize[8] = 1; grouSize[8] <= 64 / grouSize[6] / grouSize[7]; grouSize[8] *= 2) {
+				grouSize[8] = 256 / grouSize[6] / grouSize[7];
+					System.out.print(grouSize[6] +" "+ grouSize[7] + " " + grouSize[8] + " ");
+					OpenCL.setTestGrpSize(grouSize);
+					l2.setRegenerateKernels();
+					cnn.forwardPass(testInput);
+					cnn.calCostErr(testLabel, 0);
+					cnn.getOutputLayer().backpropagation();
+					l3.backpropagation();
+					cnn.releaseCLMem();
+
+//					cnn.backPropagation(testLabel, 0);
+//					grouSize[4] *= 2;
+//					grouSize[5] = 64 / grouSize[4];
+//				}
+			}
+		}
+	}
+	
 }

@@ -89,8 +89,8 @@ public class CIFAR10DataProvider implements DataProvider {
 				float mean1 = 0, mean2 = 0, mean3 = 0;
 				for (int j = 0; j < 1024; j++) {
 					mean1 += currentImage[j] & 0xFF;
-					mean2 += currentImage[1024 + j] & 0xFF;
-					mean3 += currentImage[2048 + j] & 0xFF;										
+					mean1 += currentImage[1024 + j] & 0xFF;
+					mean1 += currentImage[2048 + j] & 0xFF;										
 				}
 //				for (int j = 0; j < 1024; j++) {
 //					currentImage[j] -= mean1 / 1024;
@@ -100,11 +100,11 @@ public class CIFAR10DataProvider implements DataProvider {
 				//***********************************
 				for (int j = 0; j < dataSize; j++) {
 					if (j < 1024)
-						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean1 / 1024;
+						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean1 / 3072;
 					else if (j < 2048)
-						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean2 / 1024;
+						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean1 / 3072;
 					else if (j < 3072)
-						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean3 / 1024;
+						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean1 / 3072;
 				}
 //				for (int j = 0; j < dataSize; j++) {
 //					result[i * dataSize + j] = (currentImage[j] & 0xFF);///256.0f;

@@ -229,9 +229,9 @@ public class TestMnist {
 		float baselearningRate = 0.02f;
 		float momentum = 0.9f;
 		float weightDecay = 0;//0.001f;
-		int lrChangeCycle = 5 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
-		float lrChangeRate = 0.33f;
-		int epoch = 5;
+		int lrChangeCycle = 30 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
+		float lrChangeRate = 0.1f;
+		int epoch = 40;
 		int[][] cnnLayers = new int[][] {{1, 0, 0 ,0}, {20, 5, 5, 1},{2, 2, 2}, {50, 5, 5, 1},{2, 2, 2}, {500}, {10}};
 		String path = "/home/jxchang/project/records/mnist/.cnn.weights";
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
@@ -252,7 +252,7 @@ public class TestMnist {
 				+ "{0} {1} bias \n"
 				+ "conv layer activation type: {2}\n"
 				+ "fully layer activation type: {3}"
-				, new Object[] {Arrays.deepToString(cnnLayers), addBias ? "with" : "without", ActivationType.TANH, ActivationType.TANH});
+				, new Object[] {Arrays.deepToString(cnnLayers), addBias ? "with" : "without", ActivationType.SIGMOID, ActivationType.SIGMOID});
 
 		logger.log(Level.INFO, "Traning configuration: \n"
 				+ "useOpenCL = {0} \n"
@@ -270,22 +270,22 @@ public class TestMnist {
 		logger.log(Level.INFO, "Pretest before training...");
 //		cnn.test(trainingSet);
 		cnn.test(testSet);
-
-		cnn.loadWeights(path);
-
-		cnn.test(testSet);
-	
-		cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
-
-
-		cnn.test(trainingSet);
-//		System.out.println("Test with test set...");
-		logger.log(Level.INFO, "Saving weights...");
-		cnn.saveWeights(path);
-
-		float errorRate = cnn.test(testSet);
-		assertEquals(0, errorRate, 0.03);	
+//		cnn.loadWeights(path);
+//		cnn.test(testSet);
 		
+		float errorRate = 0;
+		for (int i = 0; i < 1; i++) {
+			cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
+			errorRate = cnn.test(testSet);
+//			baselearningRate *= lrChangeRate;
+//			logger.log(Level.INFO, "learning rate reduced to {0}", new Object[] {baselearningRate+""});
+		}
+		
+		cnn.test(trainingSet);
+
+		logger.log(Level.INFO, "Saving weights...");
+//		cnn.saveWeights(path);
+		assertEquals(0, errorRate, 0.01);	
 
 	}
 	

@@ -174,17 +174,11 @@ public class PoolingLayer implements FeatureMapLayer {
 			int offset, int rin, int cin) {
 		switch (poolingType) {
 		case AVER:
-//			int cnt = 0;
-//			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
-//				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
-//					cnt ++;
-//				}				
-//			}
+			int cnt = Math.min(poolHeight, inputFeatureMapsShape[0] - rin) * Math.min(poolWidth, inputFeatureMapsShape[1] -cin);
 			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
 				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
-//					prevErrors[offset + i * inputFeatureMapsShape[1] + j] += error /cnt;
 					float der = activationDerivFunc(previousLayer.getActivationType(), preAct[offset + i * inputFeatureMapsShape[1] + j]);
-					prevErrors[offset + i * inputFeatureMapsShape[1] + j] += error / (poolHeight * poolWidth) * der;
+					prevErrors[offset + i * inputFeatureMapsShape[1] + j] += error / cnt * der;
 				}
 			}
 
@@ -278,12 +272,13 @@ public class PoolingLayer implements FeatureMapLayer {
 		float out = 0;
 		switch (poolingType) {
 		case AVER:
+			int cnt = Math.min(poolHeight, inputFeatureMapsShape[0] - rin) * Math.min(poolWidth, inputFeatureMapsShape[1] -cin);
 			for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShape[0]; i++) {
 				for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShape[1]; j++) {
 					out += preAct[offset + i * inputFeatureMapsShape[1] + j];
 				}				
 			}	
-			out /= poolHeight * poolWidth;
+			out /= cnt;
 			break;
 		case MAX:
 			out = preAct[offset + rin * inputFeatureMapsShape[1] + cin];

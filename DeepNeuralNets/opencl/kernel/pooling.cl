@@ -61,14 +61,17 @@ void atomic_add_global(volatile global float *source, const float operand) {
 
 float poolingFunc(__global float *preAct, int offset, int rin, int cin) {
   float out = 0;
+  int cnt = min(poolHeight, inputFeatureMapsShapeH - rin) * min(poolWidth, inputFeatureMapsShapeW -cin);
   switch (poolingType) {
   case AVER:
     for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShapeH; i++) {
       for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShapeW; j++) {
         out += preAct[offset + i * inputFeatureMapsShapeW + j];
+        // cnt++;
       }       
     } 
-    out /= poolHeight * poolWidth;
+    out /= cnt;
+    // out /= poolHeight * poolWidth;
     break;
   case MAX:
     out = preAct[offset + rin * inputFeatureMapsShapeW + cin];
@@ -88,19 +91,14 @@ float poolingFunc(__global float *preAct, int offset, int rin, int cin) {
 void poolingBackFunc(__global float *preAct, __global float *prevErrors, float error,
     int offset, int rin, int cin) {
   float der = 0;
+  int cnt = min(poolHeight, inputFeatureMapsShapeH - rin) * min(poolWidth, inputFeatureMapsShapeW -cin);
   switch (poolingType) {
   case AVER:
-      // int cnt = 0;
-      // for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShapeH; i++) {
-      //   for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShapeW; j++) {
-      //     cnt ++;
-      //   }       
-      // }
       for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShapeH; i++) {
         for (int j = cin; j < cin + poolWidth && j < inputFeatureMapsShapeW; j++) {
-          // prevErrors[offset + i * inputFeatureMapsShapeW + j] += err /cnt;
           der = derivative(preAct[offset + i * inputFeatureMapsShapeW + j]);
-          atomic_add_global(&prevErrors[offset + i * inputFeatureMapsShapeW + j], error / (poolHeight * poolWidth) * der);
+          // atomic_add_global(&prevErrors[offset + i * inputFeatureMapsShapeW + j], error / (poolHeight * poolWidth) * der);
+          atomic_add_global(&prevErrors[offset + i * inputFeatureMapsShapeW + j], error / cnt * der);
         }
       }
     break;
@@ -114,12 +112,10 @@ void poolingBackFunc(__global float *preAct, __global float *prevErrors, float e
           rMax = i;
           cMax = j;
         }
-        // prevErrors[offset + i * inputFeatureMapsShapeW + j] = 0;
       }       
     }
     der = derivative(preAct[offset + rMax * inputFeatureMapsShapeW + cMax]);
     atomic_add_global(&prevErrors[offset + rMax * inputFeatureMapsShapeW + cMax], error * der);
-    // prevErrors[offset + rMax * inputFeatureMapsShapeW + cMax] += error;
     break;
   default:
     break;

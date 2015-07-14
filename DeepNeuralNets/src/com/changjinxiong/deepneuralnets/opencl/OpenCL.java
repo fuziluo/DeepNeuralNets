@@ -22,7 +22,12 @@ public final class OpenCL {
 	private static cl_command_queue commandQueue = commandQueueInitializer();
 	private static cl_kernel fakeKernel;
 	private static int[] groupSizes;
-	private static long cacheLineSize, maxWorkGrpSize, localMemSize, workGrpMul;
+	private static long numOfCU, cacheLineSize, maxWorkGrpSize, localMemSize, workGrpMul;
+	private static int[] testGrpSize = new int[] {
+		4, 4, 16,
+		4, 4, 16,
+		4, 4, 16,
+		};;
 	
 	static {
 //		if (fakeKernel == null) {
@@ -37,6 +42,8 @@ public final class OpenCL {
 		//query device for parameters
         long[] longBuff = new long[1];
         long[] param_value_size_ret = new long[1];
+        clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, 8, Pointer.to(longBuff), param_value_size_ret);
+        numOfCU = longBuff[0];
         clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, 8, Pointer.to(longBuff), param_value_size_ret);
         cacheLineSize = longBuff[0];
         clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, 8, Pointer.to(longBuff), param_value_size_ret);
@@ -49,8 +56,9 @@ public final class OpenCL {
 		LOGGER.log(Level.FINE, "CL_DEVICE_MAX_WORK_GROUP_SIZE {0} \n"
 				+ "CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE {1} \n"
 				+ "CL_DEVICE_LOCAL_MEM_SIZE {2} \n"
-				+ "CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE {3} \n", 
-				new Object[] {maxWorkGrpSize, cacheLineSize, localMemSize, workGrpMul});
+				+ "CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE {3} \n"
+				+ "CL_DEVICE_MAX_COMPUTE_UNITS {4} \n", 
+				new Object[] {maxWorkGrpSize, cacheLineSize, localMemSize, workGrpMul, numOfCU});
 //		System.out.println("CL_DEVICE_MAX_WORK_GROUP_SIZE " + maxWorkGrpSize);	
 //      System.out.println("CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE " + cacheLineSize);	
 //		System.out.println("CL_DEVICE_LOCAL_MEM_SIZE " + localMemSize);
@@ -168,15 +176,15 @@ public final class OpenCL {
         try {
 			//TODO
 			fileContent = new String(Files.readAllBytes(Paths.get(path, "opencl", "kernel", kernelSource)));
-			fileContent = "#define groupSize_k0_M " + groupSizes[0] + "\n" + fileContent;
-			fileContent = "#define groupSize_k0_N " + groupSizes[1] + "\n" + fileContent;
-			fileContent = "#define groupSize_k0_K " + groupSizes[2] + "\n" + fileContent;
-			fileContent = "#define groupSize_k1_M " + groupSizes[3] + "\n" + fileContent;
-			fileContent = "#define groupSize_k1_N " + groupSizes[4] + "\n" + fileContent;
-			fileContent = "#define groupSize_k1_K " + groupSizes[5] + "\n" + fileContent;
-			fileContent = "#define groupSize_k2_M " + groupSizes[6] + "\n" + fileContent;
-			fileContent = "#define groupSize_k2_N " + groupSizes[7] + "\n" + fileContent;
-			fileContent = "#define groupSize_k2_K " + groupSizes[8] + "\n" + fileContent;
+			fileContent = "#define groupSize_k0_X " + groupSizes[0] + "\n" + fileContent;
+			fileContent = "#define groupSize_k0_Y " + groupSizes[1] + "\n" + fileContent;
+			fileContent = "#define groupSize_k0_Z " + groupSizes[2] + "\n" + fileContent;
+			fileContent = "#define groupSize_k1_X " + groupSizes[3] + "\n" + fileContent;
+			fileContent = "#define groupSize_k1_Y " + groupSizes[4] + "\n" + fileContent;
+			fileContent = "#define groupSize_k1_Z " + groupSizes[5] + "\n" + fileContent;
+			fileContent = "#define groupSize_k2_X " + groupSizes[6] + "\n" + fileContent;
+			fileContent = "#define groupSize_k2_Y " + groupSizes[7] + "\n" + fileContent;
+			fileContent = "#define groupSize_k2_Z " + groupSizes[8] + "\n" + fileContent;
 			fileContent = "#define SIGMOID " + ActivationType.SIGMOID.getValue()  + "\n" + fileContent;
 			fileContent = "#define RELU " + ActivationType.RELU.getValue()  + "\n" + fileContent;
 			fileContent = "#define TANH " + ActivationType.TANH.getValue()  + "\n" + fileContent;
@@ -280,7 +288,7 @@ public final class OpenCL {
 //		System.out.printf("%d %d %d %d\n",k0_M, k0_N, k0_K, (k0_M + k0_N)*k0_K*4*4);
 				
 		//FIXME
-		int[] groupSize = null;
+		int[] groupSize = new int[9];
 		if (layerType == LayerType.FULLY) {
 		int size = 8;
 		groupSize = new int[] {
@@ -297,24 +305,59 @@ public final class OpenCL {
 								};
 			
 		} else if (layerType == LayerType.CONV) {
+			int numOfInputFeatureMaps = para[0];
+			int inputFeatureMapH = para[1];
+			int inputFeatureMapW = para[2];
+			int filterW = para[3];
+			int filterH = para[4];
+			int numOfOutputFeatureMaps = para[5];
+			int outputFeatureMapH = para[6];
+			int outputFeatureMapW = para[7];
+			int batchSize = para[8];
+			int stride = para[9];
+			int addBias = para[10];
+
+			//forward pass
+			groupSize[0] = 4;
+			groupSize[1] = 4;
+			groupSize[2] = 4;
+			//back gradients
+			int globalSize = batchSize * numOfOutputFeatureMaps * numOfInputFeatureMaps;
+//			if () {
+//				
+//			}
+			if (batchSize < 100) {
+				groupSize[3] = 1;
+				
+			}
+			
+			//back error
+			
+			
 			groupSize = new int[] {
 								4, 4, 16,
 								4, 4, 16,
 								4, 4, 16,
 								};
 			groupSize = new int[] {
-					8, 4, 2,
-					4, 4, 4,
+					16, 4, 1,
+					1, 8, 8,
 					8, 8, 1,
 					};
 			groupSize = new int[] {
-					8, 4, 2,
 					4, 4, 4,
+					1, 16, 4,
 					8, 8, 4,
 					};
+			groupSize = testGrpSize;
 		}
 
 		return groupSize;	
+	}
+	
+	//for test only
+	public static void setTestGrpSize(int[] g) {
+		testGrpSize = g;
 	}
 
 	

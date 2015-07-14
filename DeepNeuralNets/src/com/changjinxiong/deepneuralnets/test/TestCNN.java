@@ -45,29 +45,29 @@ public class TestCNN {
 						};
 		cl1.setInputs(inputs);
 		float[] weights = {	0.1f, 0.2f, 
-							0.3f, 0.4f, 0.5f,
+							0.3f, 0.4f, 
 							0.6f, 0.7f,
-							0.8f, 0.9f, 1,
+							0.8f, 0.9f, 0.5f,
 							
 							1.1f, 1.2f, 
-							1.3f, 1.4f, 1.5f,
+							1.3f, 1.4f, 
 							1.6f, 1.7f,
-							1.8f, 1.9f, 2,
+							1.8f, 1.9f, 1,
 							};
 		cl2.setWeight(weights);
 		cl2.setActivationType(ActivationType.SIGMOID);
 		cl2.forwardPass();
 		float[] act = cl2.getActivations();
 		float[] actCorrect = {	
-				5.8400f,    6.2400f,
-			    7.0400f,    7.4400f,
-			    14.2400f,   15.4400f,
-			    17.8400f,   19.0400f,
+				4.8400f,    5.2400f,
+			    6.0400f,    6.4400f,
+			    11.7400f,   12.9400f,
+			    15.3400f,   16.5400f,
 			    
-			    13.8400f,   14.2400f,
-			    15.0400f,   15.4400f,
-			    38.2400f,   39.4400f,
-			    41.8400f,   43.0400f,
+			    12.8400f,   13.2400f,
+			    14.0400f,   14.4400f,
+			    35.7400f,   36.9400f,
+			    39.3400f,   40.5400f,
 
 		};
 		for (int i = 0; i < actCorrect.length; i++) {
@@ -154,11 +154,11 @@ public class TestCNN {
 						};
 		cl1.setInputs(inputs);
 		float[] weights = {	0.1f, 0.2f, 
-							0.3f, 0.4f, 0.5f,
+							0.3f, 0.4f, 
 							0.1f, 0.2f, 
 							0.3f, 0.4f, 0.5f,
 							0.6f, 0.7f,
-							0.8f, 0.9f, 1,
+							0.8f, 0.9f,
 							0.6f, 0.7f,
 							0.8f, 0.9f, 1,
 							};
@@ -166,19 +166,19 @@ public class TestCNN {
 		cl2.setActivationType(ActivationType.SIGMOID);
 		cl2.forwardPass();
 		float[] act = cl2.getActivations();
-		float[] actCorrect = {	    2.7400f,    2.9400f,    1.8200f,
-								    3.3400f,    3.5400f,    2.0600f,
-								    1.7600f,    1.8200f,    1.2800f, 
-								    6.9400f,    7.5400f,    4.7200f,
-								    8.7400f,    9.3400f,    5.5600f,
-								    5.2600f,    5.5200f,    3.6800f,
-								    
-								    2.7400f,    2.9400f,    1.8200f,
-								    3.3400f,    3.5400f,    2.0600f,
-								    1.7600f,    1.8200f,    1.2800f, 
-								    6.9400f,    7.5400f,    4.7200f,
-								    8.7400f,    9.3400f,    5.5600f,
-								    5.2600f,    5.5200f,    3.6800f 
+		float[] actCorrect = {	    2.2400f,    2.4400f,    1.3200f,
+								    2.8400f,    3.0400f,    1.5600f,
+								    1.2600f,    1.3200f,    0.7800f,
+								    5.9400f,    6.5400f,    3.7200f,
+								    7.7400f,    8.3400f,    4.5600f,
+								    4.2600f,    4.5200f,    2.6800f,
+													    
+								    2.2400f,    2.4400f,    1.3200f,
+								    2.8400f,    3.0400f,    1.5600f,
+								    1.2600f,    1.3200f,    0.7800f, 
+								    5.9400f,    6.5400f,    3.7200f,
+								    7.7400f,    8.3400f,    4.5600f,
+								    4.2600f,    4.5200f,    2.6800f, 
 							};
 		for (int i = 0; i < actCorrect.length; i++) {
 			actCorrect[i] = (float) (1 / (1 + Math.exp(-actCorrect[i])));
@@ -246,7 +246,7 @@ public class TestCNN {
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
 		cnn.setInputShape(new int[] {4, 4});
-		assertEquals(l2.getWeight().length, 40, 0);
+		assertEquals(l2.getWeight().length, 38, 0);
 //		assertNull(l3.getWeight());
 		l2.setActivationType(ActivationType.SIGMOID);
 		l3.setActivationType(ActivationType.SIGMOID);
@@ -274,9 +274,9 @@ public class TestCNN {
 		int[] inputShape = {4, 4};
 		cnn.setInputShape(inputShape);
 		
-		float[] w2 = {	0.1f, -0.2f, 0.3f, -0.4f, 0.5f, -0.6f, 0.7f, -0.8f, 0.9f, 1.0f,
+		float[] w2 = {	0.1f, -0.2f, 0.3f, -0.4f, 0.5f, -0.6f, 0.7f, -0.8f, 0.9f, 
 						0.1f, -0.2f, 0.3f, -0.4f, 0.5f, -0.6f, 0.7f, -0.8f, 0.9f, 1.0f,
-						1.1f, -1.2f, 1.3f, -1.4f, 1.5f, -1.6f, 1.7f, -1.8f, 1.9f, 2.0f,
+						1.1f, -1.2f, 1.3f, -1.4f, 1.5f, -1.6f, 1.7f, -1.8f, 1.9f, 
 						1.1f, -1.2f, 1.3f, -1.4f, 1.5f, -1.6f, 1.7f, -1.8f, 1.9f, 2.0f,
 		};
 		l2.setWeight(w2);
@@ -287,8 +287,8 @@ public class TestCNN {
 		};
 		l3.setWeight(w3);
 		
-		float[] actCorrect = {	0.6226324f, 0.8089633f, 0.91574115f, 0.96539f, 
-								0.6229384f, 0.81499475f, 0.9215472f, 0.96906114f
+		float[] actCorrect = {	0.61802465f, 0.78727967f, 0.8943569f, 0.9508964f, 
+								0.62346935f, 0.8107077f, 0.91720235f, 0.9662761f
 		};
 		
 		cnn.forwardPass(testInput);
@@ -309,13 +309,13 @@ public class TestCNN {
 		boolean addBias = true;
 		boolean useOpenCL = true;
 		int costType = 0;
-		int batchSize = 100;
+		int batchSize = 10;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, false, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
 		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
 		ConvolutionalLayer l3 = (ConvolutionalLayer) l2.getNextLayer();
 		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
-		l2.initializeWeights(0.0125f, 0);
+		l2.initializeWeights(0.0001f, 0);
 		l3.initializeWeights(0.25f, 0);
 		l4.initializeWeights(0.25f, 0);
 //		cnn.setInputShape(new int[] {28, 28});
@@ -331,7 +331,7 @@ public class TestCNN {
 		cnn.forwardPass(tin);
 		
 		cnn.backPropagation(tout, costType);
-		int i = 10;
+		int i = 27; //the index of bias
 		Layer l = l2;
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
@@ -410,11 +410,11 @@ public class TestCNN {
 		l7.setPoolingType(PoolingType.AVER);
 		cnn.setInputShape(new int[] {32, 32});
 
-		l2.initializeWeights(0.0001f, 0.01f);
-		l4.initializeWeights(0.01f, 0.01f);
-		l6.initializeWeights(0.01f, 0.01f);
-		l8.initializeWeights(0.1f, 0.01f);
-		l9.initializeWeights(0.1f, 0.01f);
+		l2.initializeWeights(0.0001f, 0);
+		l4.initializeWeights(0.01f, 0);
+		l6.initializeWeights(0.01f, 0);
+		l8.initializeWeights(0.1f, 0);
+		l9.initializeWeights(0.1f, 0);
 
 
 		
@@ -448,7 +448,7 @@ public class TestCNN {
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.021f;
+		double e = 0.000125f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
@@ -470,7 +470,7 @@ public class TestCNN {
 	@Test
 	public void gradientCheckPadding() {
 //		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
-		int[][] para = {{3, 0, 0, 0}, {3, 3, 3, 1}, {5, 3, 3, 1}, {4, 3, 3, 1}, {10}};
+		int[][] para = {{3, 0, 0, 0}, {3, 3, 3, 1}, {4, 3, 3, 1}, {4, 3, 3, 1}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = true;
 		int costType = 0;
@@ -501,7 +501,7 @@ public class TestCNN {
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.000625f;
+		double e = 0.001f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
@@ -586,8 +586,8 @@ public class TestCNN {
 //		assertArrayEquals("!!",e1,e2, 0.0001f);
 		float[] g1 = l3.getGradients();
 		float[] g2 = l13.getGradients();
-//		System.out.println("g1 "+ g1.length + Arrays.toString(g1));
-//		System.out.println("g2 "+ g2.length + Arrays.toString(g2));
+		System.out.println("g1 "+ g1.length + Arrays.toString(g1));
+		System.out.println("g2 "+ g2.length + Arrays.toString(g2));
 		assertArrayEquals("!!",g1,g2, 0.001f);
 //		OpenCL.releaseAll();
 

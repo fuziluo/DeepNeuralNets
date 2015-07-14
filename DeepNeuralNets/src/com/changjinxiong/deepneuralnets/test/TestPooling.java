@@ -116,7 +116,7 @@ public class TestPooling {
 //		System.out.println(Arrays.toString(l4.getPrevErrors()));
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.001f;
+		double e = 0.0001f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
@@ -371,7 +371,7 @@ public class TestPooling {
 	@Test
 	public void testForwardPassAverPooling() {
 		boolean addBias = false;
-		boolean useOpenCL = false;
+		boolean useOpenCL = true;
 		int numOfFeatureMaps = 2;
 		int poolHeight = 2;
 		int poolWidth = 2;

@@ -157,7 +157,7 @@ public class FullyConnectedLayer implements Layer{
 		kernel2 = clCreateKernel(program, "backCalcPrevErr", null); 
 		//for updateWeights
 		kernel3 = clCreateKernel(program, "updateWeights", null); 
-		LOGGER.log(Level.INFO, "Kernels created for {0}", this.getClass().getSimpleName());
+		LOGGER.log(Level.FINE, "Kernels created for {0}", this.getClass().getSimpleName());
 		clReleaseProgram(program);
 		int[] groupSize = OpenCL.getGroupSize(LayerType.FULLY, para);
 		localWorkSizeK0 = new long[] {groupSize[0], groupSize[1]};
