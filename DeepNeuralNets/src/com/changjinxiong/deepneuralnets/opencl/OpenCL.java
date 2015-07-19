@@ -84,7 +84,7 @@ public final class OpenCL {
         cl_platform_id platform = platforms[platformNO];
         clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 255, Pointer.to(buff), param_value_size_ret);
         String vendor = new String(buff, 0, (int)param_value_size_ret[0]);
-        LOGGER.log(Level.INFO,"Chosen platform is: {0}", vendor);
+        LOGGER.log(Level.FINE,"Chosen platform is: {0}", vendor);
         
 		return platform;
 	}
@@ -105,7 +105,7 @@ public final class OpenCL {
         long[] param_value_size_ret = new long[1];
         clGetDeviceInfo(device, CL_DEVICE_NAME, 255, Pointer.to(buff), param_value_size_ret);
         String deviceName = new String(buff, 0, (int)param_value_size_ret[0]);
-        LOGGER.log(Level.INFO, "Chosen device is: {0}", deviceName);	
+        LOGGER.log(Level.FINE, "Chosen device is: {0}", deviceName);	
 
 		return device;
 	}	
@@ -292,8 +292,8 @@ public final class OpenCL {
 		if (layerType == LayerType.FULLY) {
 		int size = 8;
 		groupSize = new int[] {
-							16, 16, 8,
-							8, 8, 24,
+							16, 16, 12,
+							8, 8, 16,
 							8, 8, 16,
 							};
 		} else if (layerType == LayerType.POOL) {
@@ -323,35 +323,35 @@ public final class OpenCL {
 			groupSize[2] = 4;
 			//back gradients
 			int globalSize = batchSize * numOfOutputFeatureMaps * numOfInputFeatureMaps;
-//			if () {
-//				
-//			}
-			if (batchSize < 100) {
+
+			if (batchSize < 50) {
 				groupSize[3] = 1;
-				
+			} else {
+				groupSize[3] = 2;
 			}
-			
+			groupSize[5] = (int) Math.sqrt(64.0 / groupSize[3] /4); 
+			groupSize[4] = 4 * groupSize[5];
 			//back error
 			
 			
+//			groupSize = new int[] {
+//								4, 4, 16,
+//								4, 4, 16,
+//								4, 4, 16,
+//								};
+//			groupSize = new int[] {
+//					16, 4, 1,
+//					1, 8, 8,
+//					8, 8, 1,
+//					};
 			groupSize = new int[] {
-								4, 4, 16,
-								4, 4, 16,
-								4, 4, 16,
-								};
-			groupSize = new int[] {
-					16, 4, 1,
-					1, 8, 8,
-					8, 8, 1,
-					};
-			groupSize = new int[] {
-					4, 4, 4,
-					1, 16, 4,
+					4, 8, 8,
+					4, 16, 4,
 					8, 8, 4,
 					};
-			groupSize = testGrpSize;
+//			groupSize = testGrpSize;
 		}
-
+//		System.out.println(Arrays.toString(groupSize));
 		return groupSize;	
 	}
 	

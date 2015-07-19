@@ -90,7 +90,7 @@ public class FullyConnectedLayer implements Layer{
 	@Override
 	protected void finalize() throws Throwable {
 		try{
-			LOGGER.log(Level.FINEST, "***releasing all cl resources***");
+			LOGGER.log(Level.FINE, "***releasing all cl resources***");
 			if (useOpenCL) {
 				if (weightsCL != null) {
 					clReleaseMemObject(weightsCL);
@@ -221,11 +221,13 @@ public class FullyConnectedLayer implements Layer{
 		if (previousLayer == null) { 
 			throw new IllegalStateException("No weights on input layer!");
 		}
+		if (weights == null) {
+			initializeWeights();
+		}
 		if (useOpenCL) {
 			cl_command_queue commandQueue = OpenCL.getCommandQueue();
 	        clEnqueueReadBuffer(commandQueue, weightsCL, CL_TRUE, 0, weights.length * Sizeof.cl_float, Pointer.to(weights), 0, null, null);
 		}
-
 		return weights;
 	}
 
@@ -414,8 +416,8 @@ public class FullyConnectedLayer implements Layer{
 //        clSetKernelArg(kernel0, 6, Sizeof.cl_int, Pointer.to(arg6));
         //enqueues a command to execute a kernel on a device
 //        int groupSize = OpenCL.getGroupSize()[0];
-    	long[] globalWorkSize = {(long) ceil((min(batchSize, 8192))/(2.0 * localWorkSizeK0[0])) * localWorkSizeK0[0], (long) ceil((min(numOfPerceptron, 8192))/(2.0 * localWorkSizeK0[1])) * localWorkSizeK0[1]};
-//        long[] local_work_size = {groupSize, groupSize};
+//    	long[] globalWorkSize = {(long) ceil((min(batchSize, 8192))/(2.0 * localWorkSizeK0[0])) * localWorkSizeK0[0], (long) ceil((min(numOfPerceptron, 8192))/(2.0 * localWorkSizeK0[1])) * localWorkSizeK0[1]};
+    	long[] globalWorkSize = {(long) ceil(batchSize/(2.0 * localWorkSizeK0[0])) * localWorkSizeK0[0], (long) ceil(numOfPerceptron/(2.0 * localWorkSizeK0[1])) * localWorkSizeK0[1]};
 //        System.out.println(Arrays.toString(global_work_size));
 //        System.out.println(Arrays.toString(local_work_size));
         clEnqueueNDRangeKernel(commandQueue, kernel0, 2, null, globalWorkSize, localWorkSizeK0, 0, null, null);
@@ -504,7 +506,8 @@ public class FullyConnectedLayer implements Layer{
 //		clSetKernelArg(kernel1, 4, Sizeof.cl_int, Pointer.to(arg14));
 //		clSetKernelArg(kernel1, 5, Sizeof.cl_int, Pointer.to(arg15));
 //		clSetKernelArg(kernel1, 6, Sizeof.cl_int, Pointer.to(arg16));
-    	long[] globalWorkSize = {(long) ceil((min(numOfPerceptron, 8192))/(2.0 * localWorkSizeK1[0])) * localWorkSizeK1[0], (long) ceil((min(weightsDim, 8192))/(2.0 * localWorkSizeK1[1])) * localWorkSizeK1[1]};
+//    	long[] globalWorkSize = {(long) ceil((min(numOfPerceptron, 8192))/(2.0 * localWorkSizeK1[0])) * localWorkSizeK1[0], (long) ceil((min(weightsDim, 8192))/(2.0 * localWorkSizeK1[1])) * localWorkSizeK1[1]};
+    	long[] globalWorkSize = {(long) ceil(numOfPerceptron /(2.0 * localWorkSizeK1[0])) * localWorkSizeK1[0], (long) ceil(weightsDim /(2.0 * localWorkSizeK1[1])) * localWorkSizeK1[1]};
 
 		clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
 		clFinish(commandQueue);
@@ -514,7 +517,7 @@ public class FullyConnectedLayer implements Layer{
 		//clean up
 		releaseActivationsCL();
 		long t2 = System.currentTimeMillis();
-//		System.out.println("gradient "+(t2 - t1));
+		System.out.println("	gradient "+(t2 - t1));
 	
 		if (previousLayer.getPreviousLayer() != null) {
 			/**************************************
@@ -546,7 +549,8 @@ public class FullyConnectedLayer implements Layer{
 //			clSetKernelArg(kernel2, 6, Sizeof.cl_int, Pointer.to(arg6));
 			clSetKernelArg(kernel2, 3, Sizeof.cl_mem, Pointer.to(arg7));
 			//enqueues a command to execute a kernel on a device
-	    	globalWorkSize = new long[] {(long) ceil((min(batchSize, 8192))/(2.0 * localWorkSizeK2[0])) * localWorkSizeK2[0], (long) ceil((min(previousLayer.getNumOfNodes(), 8192))/(2.0 * localWorkSizeK2[1])) * localWorkSizeK2[1]};
+//	    	globalWorkSize = new long[] {(long) ceil((min(batchSize, 8192))/(2.0 * localWorkSizeK2[0])) * localWorkSizeK2[0], (long) ceil((min(previousLayer.getNumOfNodes(), 8192))/(2.0 * localWorkSizeK2[1])) * localWorkSizeK2[1]};
+	    	globalWorkSize = new long[] {(long) ceil(batchSize /(2.0 * localWorkSizeK2[0])) * localWorkSizeK2[0], (long) ceil(previousLayer.getNumOfNodes() /(2.0 * localWorkSizeK2[1])) * localWorkSizeK2[1]};
 			clEnqueueNDRangeKernel(commandQueue, kernel2, 2, null, globalWorkSize, localWorkSizeK2, 0, null, null);
 			//TODO (could be optimized) wait until all previously queued OpenCL commands in command_queue are issued to the associated device and have completed
 			clFinish(commandQueue);
@@ -560,7 +564,7 @@ public class FullyConnectedLayer implements Layer{
 			nextLayer.releasePrevErrorsCL();
 		}
 		long t3 = System.currentTimeMillis();
-//		System.out.println("Error "+(t3 - t2));
+		System.out.println("	Error "+(t3 - t2));
 	}
 
 	private void backPropNoAcc() {

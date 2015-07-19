@@ -16,8 +16,13 @@ public class CIFAR10DataProvider implements DataProvider {
     private int batchSize;
     private float[] currentLabelsBatch;  
 	private boolean random;
+	private boolean zeroMean;
     
 	public CIFAR10DataProvider(String path, int batchSize, DatasetType datasetType, boolean random) {
+		this(path, batchSize, datasetType, random, true);
+	}
+	
+	public CIFAR10DataProvider(String path, int batchSize, DatasetType datasetType, boolean random, boolean zeroMean) {
 		if (datasetType == DatasetType.TRAINING_ALL) {
 			datasets = new RandomAccessFile[5];
 			try {
@@ -37,6 +42,7 @@ public class CIFAR10DataProvider implements DataProvider {
 					indexSeq.add(i);
 				}
 				this.random = random;
+				this.zeroMean = zeroMean;
 				if (random) {
 					Collections.shuffle(indexSeq, new Random()); //fix seed here for debugging TODO
 				}			
@@ -58,6 +64,7 @@ public class CIFAR10DataProvider implements DataProvider {
 					indexSeq.add(i);
 				}
 				this.random = random;
+				this.zeroMean = zeroMean;
 				if (random) {
 					Collections.shuffle(indexSeq, new Random()); //fix seed here for debugging TODO
 				}			
@@ -86,29 +93,22 @@ public class CIFAR10DataProvider implements DataProvider {
 				currentLabelsBatch = currentLabel;
 				datasets[currentDatasetNo].readFully(currentImage);
 				//******subtract image mean********
-				float mean1 = 0, mean2 = 0, mean3 = 0;
-				for (int j = 0; j < 1024; j++) {
-					mean1 += currentImage[j] & 0xFF;
-					mean1 += currentImage[1024 + j] & 0xFF;
-					mean1 += currentImage[2048 + j] & 0xFF;										
+				float mean = 0;
+				for (int j = 0; j < 3072; j++) {
+					mean += currentImage[j] & 0xFF;
 				}
-//				for (int j = 0; j < 1024; j++) {
-//					currentImage[j] -= mean1 / 1024;
-//					currentImage[1024 + j] -= mean2 / 1024;
-//					currentImage[2048 + j] -= mean3 / 1024;
-//				}
 				//***********************************
-				for (int j = 0; j < dataSize; j++) {
-					if (j < 1024)
-						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean1 / 3072;
-					else if (j < 2048)
-						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean1 / 3072;
-					else if (j < 3072)
-						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean1 / 3072;
-				}
 //				for (int j = 0; j < dataSize; j++) {
-//					result[i * dataSize + j] = (currentImage[j] & 0xFF);///256.0f;
+//					if (j < 1024)
+//						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean / 3072;
+//					else if (j < 2048)
+//						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean / 3072;
+//					else if (j < 3072)
+//						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean / 3072;
 //				}
+				for (int j = 0; j < dataSize; j++) {
+					result[i * dataSize + j] = (currentImage[j] & 0xFF) - (zeroMean ? (mean / 3072) : 0);
+				}
 			} catch (IOException e) {
 					e.printStackTrace();
 			}

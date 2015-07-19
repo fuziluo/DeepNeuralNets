@@ -97,7 +97,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	@Override
 	protected void finalize() throws Throwable{
 		try{
-			LOGGER.log(Level.INFO, "***releasing all cl resources***");
+			LOGGER.log(Level.FINE, "***releasing all cl resources***");
 			if (useOpenCL) {
 				if (weightsCL != null) {
 					clReleaseMemObject(weightsCL);
@@ -476,41 +476,37 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg1));
 		clSetKernelArg(kernel1, 2, Sizeof.cl_mem, Pointer.to(arg2));
 
-//		long[] globalWorkSize = {(long) ceil(weightsDim * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
+//		long[] globalWorkSize = {(long) ceil(filterHeight * filterWidth * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
 //				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1]};
 //		clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
 		
 		
-//		long[] globalWorkSize = {(long) ceil(filterHeight * filterWidth * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
-//				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1],
-//				(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
-//				
-//		};
+		long[] globalWorkSize = {(long) ceil(filterHeight * filterWidth * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
+				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1],
+				(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
+				
+		};
 		
 //		long[] globalWorkSize = {(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
 //				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1],
 //				(long) ceil(batchSize * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
 //				
 //		};
-		long[] globalWorkSize = {(long) ceil(batchSize * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
-				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1],
-				(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
-				
-		};
 		
-//		long[] globalWorkSize = {(long) ceil(filterHeight * filterWidth * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
+		
+//		long[] globalWorkSize = {(long) ceil(batchSize * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
 //				(long) ceil(numOfOutputFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1],
-//				(long) ceil(batchSize * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
+//				(long) ceil(numOfInputFeatureMaps * 1.0 / localWorkSizeK1[2]) * localWorkSizeK1[2]
 //				
 //		};
+		clEnqueueNDRangeKernel(commandQueue, kernel1, 3, null, globalWorkSize, localWorkSizeK1, 0, null, null);	
 		
-		clEnqueueNDRangeKernel(commandQueue, kernel1, 3, null, globalWorkSize, localWorkSizeK1, 0, null, null);		
 		clFinish(commandQueue);
 //		clReleaseMemObject(arg3);
 
 //		clEnqueueReadBuffer(commandQueue, gradientsCL, CL_TRUE, 0, gradients.length * Sizeof.cl_float, Pointer.to(gradients), 0, null, null);
 		releaseActivationsCL();
-//		System.out.printf("  back gradients %dms \n", (System.currentTimeMillis() - t));
+		System.out.printf("  	back gradients %dms \n", (System.currentTimeMillis() - t));
 //		System.out.printf("%d \n", (System.currentTimeMillis() - t));
 		t = System.currentTimeMillis();
 		/**************************************
@@ -554,7 +550,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		} else {
 			nextLayer.releasePrevErrorsCL();
 		}
-//		System.out.printf("  back prevErr %dms \n", (System.currentTimeMillis() - t));
+		System.out.printf("  	back prevErr %dms \n", (System.currentTimeMillis() - t));
 //		System.out.printf("%d \n", (System.currentTimeMillis() - t));
 	}
 	@Override

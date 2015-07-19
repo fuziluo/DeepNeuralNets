@@ -68,7 +68,7 @@ public class PoolingLayer implements FeatureMapLayer {
 	@Override
 	protected void finalize() throws Throwable {
 		try {
-			LOGGER.log(Level.FINEST, "***releasing all cl resources***");
+			LOGGER.log(Level.FINE, "***releasing all cl resources***");
 			if (useOpenCL) {
 				if (activationsCL != null) {
 					clReleaseMemObject(activationsCL);
@@ -422,7 +422,7 @@ public class PoolingLayer implements FeatureMapLayer {
 	    kernel0 = clCreateKernel(program, "forwardPass", null); 
 		//for backprop
 		kernel1 = clCreateKernel(program, "backprop", null); 
-		LOGGER.log(Level.INFO, "Kernels created for {0}", this.getClass().getSimpleName());
+		LOGGER.log(Level.FINE, "Kernels created for {0}", this.getClass().getSimpleName());
 		clReleaseProgram(program);
 		int[] groupSize = OpenCL.getGroupSize(LayerType.POOL, para);
 		localWorkSizeK0 = new long[] {groupSize[0], groupSize[1]};

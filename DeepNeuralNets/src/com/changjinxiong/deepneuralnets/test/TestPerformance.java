@@ -140,6 +140,63 @@ public class TestPerformance {
 		int labelSize = 100;
 		int[][] para = {{numOfInputFeatureMaps, 0, 0, 0}, 
 						{numOfOutputFeatureMaps, filterSize, filterSize, stride},
+						{labelSize}
+				};
+		boolean addBias = true;
+		boolean useOpenCL = true;
+		boolean padding = true;
+		int batchSize = 128;
+		
+		
+		for (batchSize = 16; batchSize >= 1; batchSize /= 4) {
+//		for (numOfInputFeatureMaps = 32; numOfInputFeatureMaps >= 8; numOfInputFeatureMaps /= 4) {
+//		for (numOfOutputFeatureMaps = 32; numOfOutputFeatureMaps >= 8; numOfOutputFeatureMaps /= 4) {
+			ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
+			Layer l1 = cnn.getInputLayer();
+			ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
+			cnn.setInputShape(new int[] {inputSize, inputSize});		
+			float[] testInput = new float[batchSize * numOfInputFeatureMaps * inputSize * inputSize];
+			float[] testLabel = new float[batchSize * labelSize];
+			System.out.println("Network: "+Arrays.deepToString(para));
+			System.out.println("batch size: "+batchSize);
+			cnn.forwardPass(testInput);
+			cnn.releaseCLMem();
+	
+			
+			int maxSize = 256;
+			int[] grouSize = new int[] {
+					4, 4, 4,
+					1, 1, maxSize,
+					16, 8, 2,
+			};
+			for (grouSize[3] = 1; grouSize[3] <= maxSize; grouSize[3] *= 2) {
+				for (grouSize[4] = 1; grouSize[4] <= maxSize / grouSize[3]; grouSize[4] *= 2) {
+					grouSize[5] = maxSize / grouSize[3] / grouSize[4];
+						System.out.print(grouSize[3] +" "+ grouSize[4] + " " + grouSize[5] + " ");
+						OpenCL.setTestGrpSize(grouSize);
+						l2.setRegenerateKernels();
+						cnn.forwardPass(testInput);
+						cnn.calCostErr(testLabel, 0);
+						cnn.getOutputLayer().backpropagation();
+						l2.backpropagation();
+						cnn.releaseCLMem();
+				}
+			}
+			OpenCL.releaseAll();
+		
+		}
+	}
+	
+	@Test
+	public void testWorkGroupSizeBackPrevErr() {
+		int numOfInputFeatureMaps = 128;
+		int numOfOutputFeatureMaps = 128;
+		int filterSize = 5;
+		int stride = 1;
+		int inputSize = 50;
+		int labelSize = 100;
+		int[][] para = {{numOfInputFeatureMaps, 0, 0, 0}, 
+						{numOfInputFeatureMaps, filterSize, filterSize, stride},
 						{numOfOutputFeatureMaps, filterSize, filterSize, stride},
 						{labelSize}
 				};
@@ -160,30 +217,25 @@ public class TestPerformance {
 		System.out.println("Network: "+Arrays.deepToString(para));
 		System.out.println("batch size: "+batchSize);
 		
+		int maxSize = 256;
 		int[] grouSize = new int[] {
 				4, 4, 4,
 				1, 16, 4,
-				1, 1, 64,
+				1, 1, maxSize,
 		};
-		for (grouSize[6] = 1; grouSize[6] <= 256; grouSize[6] *= 2) {
-			for (grouSize[7] = 1; grouSize[7] <= 256 / grouSize[6]; grouSize[7] *= 2) {
-//				for (grouSize[8] = 1; grouSize[8] <= 64 / grouSize[6] / grouSize[7]; grouSize[8] *= 2) {
-				grouSize[8] = 256 / grouSize[6] / grouSize[7];
+		for (grouSize[6] = 1; grouSize[6] <= maxSize; grouSize[6] *= 2) {
+			for (grouSize[7] = 1; grouSize[7] <= maxSize / grouSize[6]; grouSize[7] *= 2) {
+				grouSize[8] = maxSize / grouSize[6] / grouSize[7];
 					System.out.print(grouSize[6] +" "+ grouSize[7] + " " + grouSize[8] + " ");
 					OpenCL.setTestGrpSize(grouSize);
-					l2.setRegenerateKernels();
+					l3.setRegenerateKernels();
 					cnn.forwardPass(testInput);
 					cnn.calCostErr(testLabel, 0);
 					cnn.getOutputLayer().backpropagation();
 					l3.backpropagation();
 					cnn.releaseCLMem();
 
-//					cnn.backPropagation(testLabel, 0);
-//					grouSize[4] *= 2;
-//					grouSize[5] = 64 / grouSize[4];
-//				}
 			}
 		}
 	}
-	
 }
