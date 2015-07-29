@@ -44,7 +44,7 @@ float derivative(float input) {
   return output;
 }
 
-void atomic_add_global(volatile global float *source, const float operand) {
+/*void atomic_add_global(volatile global float *source, const float operand) {
     union {
         unsigned int intVal;
         float floatVal;
@@ -58,7 +58,57 @@ void atomic_add_global(volatile global float *source, const float operand) {
         prevVal.floatVal = *source;
         newVal.floatVal = prevVal.floatVal + operand;
     } while (atomic_cmpxchg((volatile global unsigned int *)source, prevVal.intVal, newVal.intVal) != prevVal.intVal);
-}
+}*/
+
+/*__kernel void forwardPass(__global float *inputFeatureMaps,
+                            __global float *weights, 
+                            __global float *outputFeatureMaps,
+                            int _outputFeatureMapH, int _outputFeatureMapW, int _numOfOutputFeatureMaps, int _batchSize,
+                            int _numOfInputFeatureMaps, int _inputFeatureMapH, int _inputFeatureMapW,
+                            int _filterH, int _filterW, int _addBias
+                            )
+{
+  int lo0 = get_local_id(0), lo1 = get_local_id(1), lo2 = get_local_id(2);
+  int gb0 = get_global_id(0), gb1 = get_global_id(1), gb2 = get_global_id(2);
+  __local float weights_buff[groupSize_k0_Y][filterW * filterH];
+
+  bool cond = gb0 < _outputFeatureMapH * _outputFeatureMapW && gb1 < _numOfOutputFeatureMaps && gb2 < _batchSize;
+  int batchOffsetIn = gb2 * _numOfInputFeatureMaps * _inputFeatureMapH * _inputFeatureMapW;
+  int batchOffsetOut = gb2 * (_numOfOutputFeatureMaps * _outputFeatureMapH * _outputFeatureMapW);
+  int featureMapOffsetOut = batchOffsetOut + gb1 * _outputFeatureMapH * _outputFeatureMapW;
+  int weightsOffsetOut = gb1 * (_filterW * _filterH * _numOfInputFeatureMaps + (_addBias ? 1 : 0));
+  int rowOut = gb0 / _outputFeatureMapW;
+  int colOut = gb0 % _outputFeatureMapW;
+  float out = 0;
+  for (int k = 0; k < _numOfInputFeatureMaps; k++) {
+    int featureMapOffsetIn = batchOffsetIn + k * _inputFeatureMapH * _inputFeatureMapW;
+    int weightsOffsetIn = weightsOffsetOut + k * _filterW * _filterH;
+    for (int c0 = 0; c0 < _filterW * _filterH; c0 += groupSize_k0_X * groupSize_k0_Z) {
+      if (c0 + lo0 * groupSize_k0_Z + lo2 < _filterW * _filterH)
+        weights_buff[lo1][c0 + lo0 * groupSize_k0_Z + lo2] = weights[weightsOffsetIn + c0 + lo0 * groupSize_k0_Z + lo2];
+   }
+    barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+    for (int r = 0; r < _filterH; r++) {
+      for (int c = 0; c < _filterW; c++) {
+        int rowIn = r + rowOut * stride;
+        int colIn = c + colOut * stride;
+        #ifdef padding
+        float preAct = select(0.0f, inputFeatureMaps[featureMapOffsetIn + rowIn * _inputFeatureMapW + colIn], rowIn < _inputFeatureMapH && colIn < _inputFeatureMapW);
+        #else
+        float preAct = inputFeatureMaps[featureMapOffsetIn + rowIn * _inputFeatureMapW + colIn];
+        #endif
+        if (cond) {
+          out += preAct * weights_buff[lo1][r * _filterW + c];
+        }
+      }
+    }
+    barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+  }
+  if (cond) {
+    out = select(out, out + weights[weightsOffsetOut + filterW * _filterH * numOfInputFeatureMaps], addBias);
+    outputFeatureMaps[featureMapOffsetOut + gb0] = activationFunction(out);
+  }
+}*/
 
 __kernel void forwardPass(__global float *inputFeatureMaps,
                             __global float *weights, 
@@ -180,7 +230,7 @@ __kernel void forwardPass(__global float *inputFeatureMaps,
   }
 }*/
 
-#define groupSize_k1_chunk 48
+#define groupSize_k1_chunk 56
   __kernel void backCalcGradients(__global float *inputFeatureMaps,
                                   __global float *errors, 
                                   __global float *gradients)

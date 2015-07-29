@@ -43,7 +43,7 @@ float derivative(float input) {
   }
   return output;
 }
-void atomic_add_global(volatile global float *source, const float operand) {
+/*void atomic_add_global(volatile global float *source, const float operand) {
     union {
         unsigned int intVal;
         float floatVal;
@@ -57,7 +57,7 @@ void atomic_add_global(volatile global float *source, const float operand) {
         prevVal.floatVal = *source;
         newVal.floatVal = prevVal.floatVal + operand;
     } while (atomic_cmpxchg((volatile global unsigned int *)source, prevVal.intVal, newVal.intVal) != prevVal.intVal);
-}
+}*/
 
 float poolingFunc(__global float *preAct, int offset, int rin, int cin) {
   float out = 0;
@@ -88,7 +88,7 @@ float poolingFunc(__global float *preAct, int offset, int rin, int cin) {
   return activationFunction(out);
 }
 
-void poolingBackFunc(__global float *preAct, __global float *prevErrors, float error,
+/*void poolingBackFunc(__global float *preAct, __global float *prevErrors, float error,
     int offset, int rin, int cin) {
   float der = 0;
   int cnt = min(poolHeight, inputFeatureMapsShapeH - rin) * min(poolWidth, inputFeatureMapsShapeW -cin);
@@ -103,6 +103,7 @@ void poolingBackFunc(__global float *preAct, __global float *prevErrors, float e
       }
     break;
   case MAX:
+  {
     float act = preAct[offset + rin * inputFeatureMapsShapeW + cin];
     int rMax = rin, cMax = cin;
     for (int i = rin; i < rin + poolHeight && i < inputFeatureMapsShapeH; i++) {
@@ -116,11 +117,55 @@ void poolingBackFunc(__global float *preAct, __global float *prevErrors, float e
     }
     der = derivative(preAct[offset + rMax * inputFeatureMapsShapeW + cMax]);
     atomic_add_global(&prevErrors[offset + rMax * inputFeatureMapsShapeW + cMax], error * der);
+  }
     break;
   default:
     break;
   }
-}
+}*/
+
+void poolingBackFunc(__global float *errors, int rin, int cin, int inputFeatureMapsOffset, int outputFeatureMapsOffset,
+                    __global float *prevError, __global float *inputFeatureMaps) {
+  float der = derivative(inputFeatureMaps[inputFeatureMapsOffset + rin * inputFeatureMapsShapeW + cin]);
+  // int rout = rin / stride, cout = cin / stride;
+  // int r = rout * stride, c = cout * stride;
+  int r = (max(0, rin - poolHeight + 1) % stride) ? (max(0, rin - poolHeight + 1) + stride - max(0, rin - poolHeight + 1) % stride) : max(0, rin - poolHeight + 1);
+  int c = (max(0, cin - poolWidth + 1) % stride) ? (max(0, cin - poolWidth + 1) + stride - max(0, cin - poolWidth + 1) % stride) : max(0, cin - poolWidth + 1);
+  switch (poolingType) {
+  case AVER:
+  {
+    for (int i = r; i <= rin; i += stride) {
+      for (int j = c; j <= cin; j += stride) {
+        int cnt = min(poolHeight, inputFeatureMapsShapeH - i) * min(poolWidth, inputFeatureMapsShapeW - j);
+        *prevError += errors[outputFeatureMapsOffset + i / stride * outputFeatureMapsShapeW + j / stride] / cnt * der;
+      }
+    }
+    break;
+  } 
+  case MAX:
+  { 
+    for (int i = r; i <= rin; i += stride) {
+      for (int j = c; j <= cin; j += stride) {
+        // float err = errors[outputFeatureMapsOffset + i / stride * outputFeatureMapsShapeW + j / stride];
+        int rmax = i, cmax = j;
+        for (int m = i; m < i + poolHeight && m < inputFeatureMapsShapeH; m++) {
+          for (int n = j; n < j + poolWidth && n < inputFeatureMapsShapeW; n++) {
+            if (inputFeatureMaps[inputFeatureMapsOffset + rmax * inputFeatureMapsShapeW + cmax] < inputFeatureMaps[inputFeatureMapsOffset + m * inputFeatureMapsShapeW + n]) {
+              rmax = m;
+              cmax = n;
+            }
+          }
+        }
+        if (rmax == rin && cmax == cin)
+          *prevError += errors[outputFeatureMapsOffset + i / stride * outputFeatureMapsShapeW + j / stride] * der;
+      }
+    }       
+    break;
+  }
+  default:
+    break;
+  }
+} 
 
 
 __kernel void forwardPass(__global float *inputFeatureMaps, __global float *outputFeatureMaps)
@@ -142,7 +187,7 @@ __kernel void forwardPass(__global float *inputFeatureMaps, __global float *outp
     }   
   }
 }
-__kernel void backprop(__global float *errors, __global float *inputFeatureMaps, __global float *prevErrors)
+/*__kernel void backprop(__global float *errors, __global float *inputFeatureMaps, __global float *prevErrors)
 {
   int lo0 = get_local_id(0), lo1 = get_local_id(1);
   int gb0 = get_global_id(0), gb1 = get_global_id(1);
@@ -161,5 +206,28 @@ __kernel void backprop(__global float *errors, __global float *inputFeatureMaps,
           inputFeatureMapsOffset, rin, cin);
     }  
   } 
+}*/
+__kernel void backprop(__global float *errors, __global float *inputFeatureMaps, __global float *prevErrors)
+{
+  int lo0 = get_local_id(0), lo1 = get_local_id(1);
+  int gb0 = get_global_id(0), gb1 = get_global_id(1);
+  if(gb1 < numOfFeatureMaps && gb0 < inputFeatureMapsShapeH * inputFeatureMapsShapeW) {
+    for (int i = 0; i < batchSize; i++) {
+      int inputBatchOffset = i * numOfFeatureMaps * inputFeatureMapsShapeH * inputFeatureMapsShapeW;
+      int outputBatchOffest = i * numOfFeatureMaps * outputFeatureMapsShapeH * outputFeatureMapsShapeW;
+      int inputFeatureMapsOffset = inputBatchOffset +  gb1 * inputFeatureMapsShapeH * inputFeatureMapsShapeW;
+      int outputFeatureMapsOffset = outputBatchOffest + gb1 * outputFeatureMapsShapeH * outputFeatureMapsShapeW;
+      int rin = gb0 / inputFeatureMapsShapeW;
+      int cin = gb0 % inputFeatureMapsShapeW;
+      // int rout = rin / stride;
+      // int cout = cin / stride;
 
+      // poolingBackFunc(inputFeatureMaps, prevErrors, errors[outputFeatureMapsOffset + rout * outputFeatureMapsShapeW + cout], 
+      //     inputFeatureMapsOffset, rin, cin);
+      poolingBackFunc(errors, rin, cin, inputFeatureMapsOffset, outputFeatureMapsOffset,
+                      &prevErrors[inputFeatureMapsOffset + rin * inputFeatureMapsShapeW + cin], inputFeatureMaps);//
+    }  
+  } 
 }
+
+

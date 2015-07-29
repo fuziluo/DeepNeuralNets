@@ -246,8 +246,8 @@ __kernel void updateWeights(__global float *gradients, __global float *weights, 
 {
     int b0 = get_group_id(0);
     int t0 = get_local_id(0);
-    float private_weights[1];
-    float private_weightsUpdate[1];
+    float private_weights;
+    float private_weightsUpdate;
 
     float lr = learningRate;
     float decay = weightDecay_batchSize;
@@ -258,12 +258,12 @@ __kernel void updateWeights(__global float *gradients, __global float *weights, 
         decay = 0;
       }
       if (len >= t0 + c0 + 1) {
-        private_weights[0] = weights[t0 + c0];
-        private_weightsUpdate[0] = weightsUpdate[t0 + c0];
-        private_weightsUpdate[0] = (((momentum * private_weightsUpdate[0]) - (lr * gradients[t0 + c0] )) - ((lr * decay) * private_weights[0]));
-        private_weights[0] += private_weightsUpdate[0];
-        weightsUpdate[t0 + c0] = private_weightsUpdate[0];
-        weights[t0 + c0] = private_weights[0];
+        private_weights = weights[t0 + c0];
+        private_weightsUpdate = weightsUpdate[t0 + c0];
+        private_weightsUpdate = momentum * private_weightsUpdate - lr * gradients[t0 + c0]  - lr * decay * private_weights;
+        private_weights += private_weightsUpdate;
+        weightsUpdate[t0 + c0] = private_weightsUpdate;
+        weights[t0 + c0] = private_weights;
       }
     }
 }
