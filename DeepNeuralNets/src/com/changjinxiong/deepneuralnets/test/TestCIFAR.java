@@ -54,7 +54,7 @@ public class TestCIFAR {
 		type.setVisible(true);
 		frame.getContentPane().setVisible(true);
 		frame.setVisible(true);
-		CIFAR10DataProvider cp = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", 1, DatasetType.TRAINING_ALL, false, false);
+		CIFAR10DataProvider cp = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", 1, DatasetType.TRAINING_ALL, false, true);
 		int width = 32;
 		int height = 32;
 		String[] labels= {"airplane", 
@@ -279,12 +279,12 @@ public class TestCIFAR {
 		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider(p, batchSize, DatasetType.TRAINING_ALL, false);
 		CIFAR10DataProvider TestSet = new CIFAR10DataProvider(p, batchSize, DatasetType.TEST, false);
 		int costType = 0; 
-		float baselearningRate = 0.002f;
+		float baselearningRate = 0.001f;
 		float momentum = 0.9f;
-		float weightDecay = 0.4f;//0.4f;//0.01f;
-		int lrChangeCycle = 8 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
-		float lrChangeRate = 0.1f;
-		int epoch = 10;
+		float weightDecay = 0;//0.004f;//0.01f;
+		int lrChangeCycle = 1 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
+		float lrChangeRate = 0.7f;
+		int epoch = 8;
 		int[][] cnnLayers = new int[][] {	{3, 0, 0 ,0}, 
 											{32, 5, 5, 1},
 											{3, 3, 2}, 
@@ -296,7 +296,6 @@ public class TestCIFAR {
 											{10}
 											};
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
-		cnn.setInputShape(new int[] {32, 32});
 		Layer l1 = cnn.getInputLayer();
 		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
 		PoolingLayer l3 = (PoolingLayer) l2.getNextLayer();
@@ -306,7 +305,7 @@ public class TestCIFAR {
 		PoolingLayer l7 = (PoolingLayer) l6.getNextLayer();
 		FullyConnectedLayer l8 = (FullyConnectedLayer) l7.getNextLayer();
 		FullyConnectedLayer l9 = (FullyConnectedLayer) l8.getNextLayer();
-		l2.setActivationType(ActivationType.RELU);
+		l2.setActivationType(ActivationType.NONE);
 		l4.setActivationType(ActivationType.RELU);
 		l6.setActivationType(ActivationType.RELU);
 		l8.setActivationType(ActivationType.NONE);
@@ -314,6 +313,8 @@ public class TestCIFAR {
 		l3.setPoolingType(PoolingType.MAX);
 		l5.setPoolingType(PoolingType.AVER);
 		l7.setPoolingType(PoolingType.AVER);
+//		l2.setPadding(false);
+		cnn.setInputShape(new int[] {32, 32});
 		
 		l2.initializeWeights(0.0001f, 0);
 		l4.initializeWeights(0.01f, 0f);
@@ -321,11 +322,11 @@ public class TestCIFAR {
 		l8.initializeWeights(0.1f, 0);
 		l9.initializeWeights(0.1f, 0);		
 
-//		l2.setLearningRateMultiplication(0.01f);
-//		l4.setLearningRateMultiplication(1);
-//		l6.setLearningRateMultiplication(10);
-//		l8.setLearningRateMultiplication(10);
-//		l9.setLearningRateMultiplication(100);
+		l2.setLearningRateMultiplication(2f);
+		l4.setLearningRateMultiplication(2.5f);
+		l6.setLearningRateMultiplication(2f);
+		l8.setLearningRateMultiplication(1.5f);
+		l9.setLearningRateMultiplication(5f);
 		
 		Logger logger = Logger.getLogger("CIFAR10 traing with CNN");
 		logger.log(Level.INFO, "CNN architecture: \n"
@@ -350,17 +351,19 @@ public class TestCIFAR {
 		logger.log(Level.INFO, "Pretest before training...");
 //		cnn.test(TestSet);
 //		cnn.loadWeights(path);
-		cnn.test(TestSet);
+//		cnn.test(TestSet);
 			
-		cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch);
+		cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, epoch, TestSet, 500);
+//		cnn.train(trainingSet, costType, baselearningRate/10, momentum, weightDecay, lrChangeCycle, lrChangeRate, 2, TestSet, 500);
+
 
 		cnn.test(trainingSet);
 		
-//		logger.log(Level.INFO, "Saving weights...");
+		logger.log(Level.INFO, "Saving weights...");
 //		cnn.saveWeights(path);
 
-		float errorRate = cnn.test(TestSet);
-		assertEquals(0, errorRate, 0.1);	
+//		float errorRate = cnn.test(TestSet);
+//		assertEquals(0, errorRate, 0.1);	
 
 	}
 	

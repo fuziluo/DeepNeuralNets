@@ -202,9 +202,9 @@ public class TestCNN {
 		Layer l5 = l4.getNextLayer();
 		l1.setInputShape(new int[] {4, 4});
 
-		assertEquals(l2.getWeight().length, 80, 0);
-		assertEquals(l3.getWeight().length, 60, 0);
-		assertNull(l4.getWeight());
+		assertEquals(l2.getWeight().length, 76, 0);
+		assertEquals(l3.getWeight().length, 51, 0);
+		assertEquals(l4.getWeight().length, 16, 0);
 		assertEquals(l5.getWeight().length, 25, 0);
 		
 		float[] testInput = {	0.1f, 0.2f, 0.1f, 0.2f,
@@ -230,7 +230,7 @@ public class TestCNN {
 		int[] inputShape = {4, 4};
 		cnn.setInputShape(inputShape);
 		cnn.forwardPass(testInput);
-		assertEquals(l4.getWeight().length, 16, 0);
+//		assertEquals(l4.getWeight().length, 16, 0);
 		float[] act = l5.getActivations();
 //		System.out.println(Arrays.toString(act));
 //		OpenCL.releaseAll();
@@ -307,7 +307,7 @@ public class TestCNN {
 //		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
 		int[][] para = {{3, 0, 0, 0}, {3, 3, 3, 1}, {4, 3, 3, 1}, {4, 3, 3, 1}, {10}};
 		boolean addBias = true;
-		boolean useOpenCL = true;
+		boolean useOpenCL = false;
 		int costType = 0;
 		int batchSize = 10;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, false, useOpenCL);
@@ -403,18 +403,18 @@ public class TestCNN {
 		l2.setActivationType(ActivationType.RELU);
 		l4.setActivationType(ActivationType.RELU);
 		l6.setActivationType(ActivationType.RELU);
-		l8.setActivationType(ActivationType.RELU);
+		l8.setActivationType(ActivationType.NONE);
 		l9.setActivationType(ActivationType.NONE);
-		l3.setPoolingType(PoolingType.MAX);
+		l3.setPoolingType(PoolingType.AVER);
 		l5.setPoolingType(PoolingType.AVER);
 		l7.setPoolingType(PoolingType.AVER);
 		cnn.setInputShape(new int[] {32, 32});
 
-		l2.initializeWeights(0.0001f, 0);
-		l4.initializeWeights(0.01f, 0);
-		l6.initializeWeights(0.01f, 0);
-		l8.initializeWeights(0.1f, 0);
-		l9.initializeWeights(0.1f, 0);
+		l2.initializeWeights(0.001f, 0);
+		l4.initializeWeights(0.1f, 0);
+		l6.initializeWeights(0.1f, 0);
+		l8.initializeWeights(1f, 0);
+		l9.initializeWeights(1f, 0);
 
 
 		
@@ -444,11 +444,11 @@ public class TestCNN {
 				l9.getWeight()[i], l9.getGradients()[i]
 				);
 		
-		Layer l = l2;
+		Layer l = l6;
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.000125f;
+		double e = 0.001f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
@@ -460,6 +460,7 @@ public class TestCNN {
 		cnn.calCostErr(tout, costType);
 		float c2 = cnn.getCost();
 		double g2 = (c2 - c1)/(2 * e);
+		System.out.println((w - e)+" "+(w + e));
 		System.out.println(c1+" "+c2);
 		System.out.println(g1+" "+g2);
 		assertEquals(1, g2/g1, 0.0015);

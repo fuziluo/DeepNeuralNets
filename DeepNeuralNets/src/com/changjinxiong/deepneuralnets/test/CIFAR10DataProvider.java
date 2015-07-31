@@ -1,9 +1,19 @@
 package com.changjinxiong.deepneuralnets.test;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.READ;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
+
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
 
@@ -17,6 +27,7 @@ public class CIFAR10DataProvider implements DataProvider {
     private float[] currentLabelsBatch;  
 	private boolean random;
 	private boolean zeroMean;
+	private float[] mean = new float[3072];;
     
 	public CIFAR10DataProvider(String path, int batchSize, DatasetType datasetType, boolean random) {
 		this(path, batchSize, datasetType, random, true);
@@ -45,7 +56,10 @@ public class CIFAR10DataProvider implements DataProvider {
 				this.zeroMean = zeroMean;
 				if (random) {
 					Collections.shuffle(indexSeq, new Random()); //fix seed here for debugging TODO
-				}			
+				}	
+				//*******TODO to test more
+				computeMean(path);
+				//********
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();
 			}
@@ -76,6 +90,54 @@ public class CIFAR10DataProvider implements DataProvider {
 		}
 	}
 
+	private void computeMean(String p) {
+		// TODO Auto-generated method stub
+		String path = Paths.get(p, "mean.mean").toString();
+		File f = new File(path);
+		if(f.exists() && !f.isDirectory()) { 
+			try {
+				ByteChannel channel = Files.newByteChannel(Paths.get(path), READ);
+				int bufferSize = 4 * 3072;
+				ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+				buffer.clear();
+				channel.read(buffer);
+				buffer.flip();
+				buffer.asFloatBuffer().get(mean);
+				channel.close();	
+//				System.out.println(Arrays.toString(mean));
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			return; 
+		}
+		
+		try {
+			for (int k = 0; k < 3072; k++) {
+				for (int i = 0; i < 5; i++) {
+					for (int j = 0; j < 10000; j++) {
+						datasets[i].seek(j * 3073 + 1 + k);
+						mean[k] += datasets[i].readUnsignedByte()& 0xFF;
+					}
+				}
+				mean[k] /= 50000;
+//				System.out.println(k + "  " + mean[k]);
+			}
+			ByteChannel channel = Files.newByteChannel(Paths.get(path), WRITE, CREATE, TRUNCATE_EXISTING);
+			int bufferSize = 4 * 3072;
+			ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+//			buffer.asFloatBuffer().put(mean);
+			channel.write(buffer);
+			channel.close();	
+			System.out.println("mean saved to " + path);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+	}
+
 	@Override
 	public float[] getNextbatchInput() {
 		int dataSize = 3 * 32 * 32;
@@ -93,10 +155,10 @@ public class CIFAR10DataProvider implements DataProvider {
 				currentLabelsBatch = currentLabel;
 				datasets[currentDatasetNo].readFully(currentImage);
 				//******subtract image mean********
-				float mean = 0;
-				for (int j = 0; j < 3072; j++) {
-					mean += currentImage[j] & 0xFF;
-				}
+//				float mean = 0;
+//				for (int j = 0; j < 3072; j++) {
+//					mean += currentImage[j] & 0xFF;
+//				}
 				//***********************************
 //				for (int j = 0; j < dataSize; j++) {
 //					if (j < 1024)
@@ -107,7 +169,8 @@ public class CIFAR10DataProvider implements DataProvider {
 //						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean / 3072;
 //				}
 				for (int j = 0; j < dataSize; j++) {
-					result[i * dataSize + j] = (currentImage[j] & 0xFF) - (zeroMean ? (mean / 3072) : 0);
+//					result[i * dataSize + j] = (currentImage[j] & 0xFF) - (zeroMean ? (mean / 3072) : 0);
+					result[i * dataSize + j] = (currentImage[j] & 0xFF) - (zeroMean ? (mean[j]) : 0);
 				}
 			} catch (IOException e) {
 					e.printStackTrace();

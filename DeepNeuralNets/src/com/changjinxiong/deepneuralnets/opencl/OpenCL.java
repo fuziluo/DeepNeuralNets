@@ -84,7 +84,7 @@ public final class OpenCL {
         cl_platform_id platform = platforms[platformNO];
         clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 255, Pointer.to(buff), param_value_size_ret);
         String vendor = new String(buff, 0, (int)param_value_size_ret[0]);
-        LOGGER.log(Level.FINE,"Chosen platform is: {0}", vendor);
+        LOGGER.log(Level.INFO,"Chosen platform is: {0}", vendor.toString());
         
 		return platform;
 	}
@@ -105,7 +105,7 @@ public final class OpenCL {
         long[] param_value_size_ret = new long[1];
         clGetDeviceInfo(device, CL_DEVICE_NAME, 255, Pointer.to(buff), param_value_size_ret);
         String deviceName = new String(buff, 0, (int)param_value_size_ret[0]);
-        LOGGER.log(Level.FINE, "Chosen device is: {0}", deviceName);	
+        LOGGER.log(Level.INFO, "Chosen device is: {0}", deviceName.toString());	
 
 		return device;
 	}	
@@ -232,6 +232,7 @@ public final class OpenCL {
 				fileContent = "#define batchSize " + para[11] + "\n" + fileContent;
 				fileContent = "#define activationType " + para[12] + "\n" + fileContent;
 				fileContent = "#define prevActivationType " + para[13] + "\n" + fileContent;
+				fileContent = "#define padding " + para[14] + "\n" + fileContent;
 //				System.out.println(fileContent);
 
 			}
@@ -314,13 +315,13 @@ public final class OpenCL {
 			int outputFeatureMapH = para[6];
 			int outputFeatureMapW = para[7];
 			int batchSize = para[8];
-			int stride = para[9];
-			int addBias = para[10];
+//			int stride = para[9];
+//			int addBias = para[10];
 
 			//forward pass
 			groupSize[0] = 4;
-			groupSize[1] = 4;
-			groupSize[2] = 4;
+			groupSize[1] = 8;
+			groupSize[2] = 8;
 			//back gradients
 			int globalSize = batchSize * numOfOutputFeatureMaps * numOfInputFeatureMaps;
 
@@ -349,6 +350,7 @@ public final class OpenCL {
 					4, 16, 4,
 					8, 8, 4,
 					};
+			//FIXME for test
 //			groupSize = testGrpSize;
 		}
 //		System.out.println(Arrays.toString(groupSize));

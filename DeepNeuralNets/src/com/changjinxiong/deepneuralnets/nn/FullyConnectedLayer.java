@@ -517,7 +517,7 @@ public class FullyConnectedLayer implements Layer{
 		//clean up
 		releaseActivationsCL();
 		long t2 = System.currentTimeMillis();
-		System.out.println("	gradient "+(t2 - t1));
+//		System.out.println("	gradient "+(t2 - t1));
 	
 		if (previousLayer.getPreviousLayer() != null) {
 			/**************************************
@@ -564,7 +564,7 @@ public class FullyConnectedLayer implements Layer{
 			nextLayer.releasePrevErrorsCL();
 		}
 		long t3 = System.currentTimeMillis();
-		System.out.println("	Error "+(t3 - t2));
+//		System.out.println("	Error "+(t3 - t2));
 	}
 
 	private void backPropNoAcc() {
@@ -637,7 +637,6 @@ public class FullyConnectedLayer implements Layer{
 			//System.out.println("R gradientsCL " + gradientsCL);
 	        gradientsCL = null;
 		} else {
-			//TODO add support for different lr for bias
 			float lr, decay;
 			for (int i = 0; i < weights.length; i++) {
 				if (addBias && i % (previousLayer.getNumOfNodes() + (addBias ? 1 : 0)) == previousLayer.getNumOfNodes() ) {

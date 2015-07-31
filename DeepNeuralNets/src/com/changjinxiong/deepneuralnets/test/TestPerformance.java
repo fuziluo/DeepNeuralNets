@@ -54,29 +54,37 @@ public class TestPerformance {
 		int numOfOutputFeatureMaps = 96;
 		int filterSize = 11;
 		int stride = 4;
-		int inputSize = 224;
-		int[][] para = {{numOfInputFeatureMaps, 0, 0, 0}, 
-						{numOfOutputFeatureMaps, filterSize, filterSize, stride},
+		int inputSize = 227;
+		int[][] para = {{3, 0, 0, 0}, 
+						{96, 11, 11, 4},
 						{3, 3, 2},
 						{256, 5, 5, 1},
 						{3, 3, 2},
 						{384, 3, 3, 1},
 						{384, 3, 3, 1},
 						{256, 3, 3, 1},
+						{3, 3, 2},
 						{4096},
 						{4096},
 						{1000}
 				};
 		boolean addBias = true;
 		boolean useOpenCL = true;
-		boolean padding = true;
+		boolean padding = false;
 		int batchSize = 256;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
-		Layer l2 = l1.getNextLayer();
+		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
-		Layer l4 = l3.getNextLayer();
+		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
 		Layer l5 = l4.getNextLayer();
+		ConvolutionalLayer l6 = (ConvolutionalLayer) l5.getNextLayer();
+		ConvolutionalLayer l7 = (ConvolutionalLayer) l6.getNextLayer();
+		ConvolutionalLayer l8 = (ConvolutionalLayer) l7.getNextLayer();
+		l4.setPadding(true);
+		l6.setPadding(true);
+		l7.setPadding(true);
+		l8.setPadding(true);
 		cnn.setInputShape(new int[] {inputSize, inputSize});		
 		float[] testInput = new float[batchSize * numOfInputFeatureMaps * inputSize * inputSize];
 		float[] testLabel = new float[batchSize * 1000];
@@ -148,7 +156,7 @@ public class TestPerformance {
 		int batchSize = 128;
 		
 		
-		for (batchSize = 16; batchSize >= 1; batchSize /= 4) {
+		for (batchSize = 128; batchSize >= 1; batchSize /= 4) {
 //		for (numOfInputFeatureMaps = 32; numOfInputFeatureMaps >= 8; numOfInputFeatureMaps /= 4) {
 //		for (numOfOutputFeatureMaps = 32; numOfOutputFeatureMaps >= 8; numOfOutputFeatureMaps /= 4) {
 			ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, padding, useOpenCL);
@@ -161,7 +169,6 @@ public class TestPerformance {
 			System.out.println("batch size: "+batchSize);
 			cnn.forwardPass(testInput);
 			cnn.releaseCLMem();
-	
 			
 			int maxSize = 256;
 			int[] grouSize = new int[] {
@@ -169,17 +176,24 @@ public class TestPerformance {
 					1, 1, maxSize,
 					16, 8, 2,
 			};
-			for (grouSize[3] = 1; grouSize[3] <= maxSize; grouSize[3] *= 2) {
-				for (grouSize[4] = 1; grouSize[4] <= maxSize / grouSize[3]; grouSize[4] *= 2) {
+			for (grouSize[3] = 2; grouSize[3] <= maxSize; grouSize[3] *= 2) {
+				for (grouSize[4] = 2; grouSize[4] <= maxSize / grouSize[3]; grouSize[4] *= 2) {
 					grouSize[5] = maxSize / grouSize[3] / grouSize[4];
 						System.out.print(grouSize[3] +" "+ grouSize[4] + " " + grouSize[5] + " ");
 						OpenCL.setTestGrpSize(grouSize);
 						l2.setRegenerateKernels();
+						try{
 						cnn.forwardPass(testInput);
+						
+						
 						cnn.calCostErr(testLabel, 0);
 						cnn.getOutputLayer().backpropagation();
 						l2.backpropagation();
 						cnn.releaseCLMem();
+						}catch(Exception e){
+							System.out.println("#");
+//							OpenCL.releaseAll();
+						}
 				}
 			}
 			OpenCL.releaseAll();

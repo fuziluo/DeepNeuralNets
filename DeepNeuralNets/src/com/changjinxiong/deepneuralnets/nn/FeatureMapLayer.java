@@ -5,4 +5,5 @@ public interface FeatureMapLayer extends Layer {
 //	public void updateFeatureMapsShapes();
 	public int getNumOfFeatureMaps();
 	public void setInputShape(int[] inputShape);
+	public void setPadding(boolean padding);
 }

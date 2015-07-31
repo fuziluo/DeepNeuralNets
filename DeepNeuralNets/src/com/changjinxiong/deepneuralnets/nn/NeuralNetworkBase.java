@@ -55,25 +55,61 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			long t = System.currentTimeMillis();
 			currentLayer.forwardPass();
 //			System.out.println("Activations"+Arrays.toString(currentLayer.getActivations()));
-			System.out.printf("  forward %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
+//			System.out.printf("  forward %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
 		}
 	}
 	/* (non-Javadoc)
 	 * @see com.changjinxiong.deepneuralnets.nn.NeuralNetwork#backPropagation(float[], boolean)
 	 */
 	@Override
+//	public void backPropagation(float[] labels, int costType) {
+//		long t = System.currentTimeMillis();
+//		calCostErr(labels, costType);
+////		System.out.printf("  calc err %dms \n", (System.currentTimeMillis() - t));
+//		Layer currentLayer = outputLayer;
+//		while (currentLayer.getPreviousLayer() != null) {
+//			t = System.currentTimeMillis();
+//			currentLayer.backpropagation();
+////			System.out.printf("  back %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
+//			currentLayer = currentLayer.getPreviousLayer();
+//		}		
+//		currentLayer.releaseCLMem();
+//	}
 	public void backPropagation(float[] labels, int costType) {
 		long t = System.currentTimeMillis();
 		calCostErr(labels, costType);
 //		System.out.printf("  calc err %dms \n", (System.currentTimeMillis() - t));
 		Layer currentLayer = outputLayer;
+		int n = 8;
 		while (currentLayer.getPreviousLayer() != null) {
 			t = System.currentTimeMillis();
+//			if (n==3||n==4)
+//			System.out.println(currentLayer.getClass().getSimpleName() + n +"="+Arrays.toString(Arrays.copyOfRange(currentLayer.getActivations(), 0,Math.min(3000, currentLayer.getActivations().length)))+";");
+
 			currentLayer.backpropagation();
-			System.out.printf("  back %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
+			if (currentLayer.getGradients() != null) {
+//				System.out.println("gradients: "+currentLayer.getClass().getSimpleName()+currentLayer.getGradients().length+Arrays.toString(Arrays.copyOf(currentLayer.getGradients(), Math.min(3000, currentLayer.getGradients().length))));
+//				System.out.println(currentLayer.getClass().getSimpleName()+n+"="+Arrays.toString(Arrays.copyOf(currentLayer.getGradients(), Math.min(3000, currentLayer.getGradients().length)))+";");
+//				System.out.println();
+//				System.out.println("weights: "+currentLayer.getClass().getSimpleName()+currentLayer.getWeight().length+Arrays.toString(Arrays.copyOf(currentLayer.getWeight(), 500)));
+//				System.out.println();
+			}
+//			if(currentLayer.getPreviousLayer().getPreviousLayer() == null) {
+//				System.out.println("prev activations "+currentLayer.getClass().getSimpleName()+currentLayer.getPreviousLayer().getActivations().length+Arrays.toString(Arrays.copyOf(currentLayer.getPreviousLayer().getActivations(), 500)));
+//				System.out.println();
+//			}
+//			System.out.println("*****"+currentLayer.getPreviousLayer().getClass().getSimpleName()+"******\n");
+			if(currentLayer.getPreviousLayer().getPreviousLayer() != null) {
+//				System.out.println(currentLayer.getPreviousLayer().getClass().getSimpleName() + (n -1)+"="+Arrays.toString(Arrays.copyOf(currentLayer.getPrevErrors(), 500))+";");
+//				System.out.println();
+			}
+
+//			System.out.printf("  back %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
 			currentLayer = currentLayer.getPreviousLayer();
+			n--;
 		}		
 		currentLayer.releaseCLMem();
+//		
 	}
 	
 
@@ -144,6 +180,10 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	@Override
 	public void train(DataProvider dp, int costType, float learningRate, float momentum, float weightDecay, 
 			 int lrChangCycle, float lrChangRate, int maxEpoch) {
+		train(dp, costType, learningRate, momentum, weightDecay, lrChangCycle, lrChangRate, maxEpoch, null, 0);	
+	}
+	public void train(DataProvider dp, int costType, float learningRate, float momentum, float weightDecay, 
+			 int lrChangCycle, float lrChangRate, int maxEpoch, DataProvider vp, int valCycle) {
 		if (costType < 0 || costType > 1) {
 			throw new IllegalArgumentException("Wrong cost type");
 		}
@@ -167,9 +207,9 @@ public class NeuralNetworkBase implements NeuralNetwork {
 //		}
 		float lr = learningRate;
 		float averageCost = 0;
-		int lrDecayTimesLimit = 1;//Integer.MAX_VALUE;
+		int lrDecayTimesLimit = Integer.MAX_VALUE;
 		int lrDecayTimes = 0;
-		for (int i = 0, j = 0, k = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize()) {
+		for (int i = 0, j = 0, k = 0, l = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize()) {
 			forwardPass(dp.getNextbatchInput());
 			//monitor the cost
 			long t = System.currentTimeMillis();
@@ -182,8 +222,9 @@ public class NeuralNetworkBase implements NeuralNetwork {
 //			System.out.println(cost);
 			j++;
 			k++;
+			l++;
 			int displyCycle = dp.getDatasetSize() / dp.getBatchSize();
-//			displyCycle = 100;
+			displyCycle = 100;
 			if (k >= displyCycle) {
 				averageCost /= k;
 				LOGGER.log(Level.INFO, "Average cost over last {0} batches is {1}", new Object[] {k, ""+averageCost});
@@ -198,8 +239,12 @@ public class NeuralNetworkBase implements NeuralNetwork {
 				j = 0;
 				lrDecayTimes++;
 			}
+			if (valCycle != 0 && vp != null && l >= valCycle) {
+				test(vp);
+				l = 0;
+			}
 			updateWeights(lr, momentum, weightDecay);	
-//			if(i >= 0) break;
+			if(i >= 0) break;
 		} 
 		releaseCLMem();
 		LOGGER.log(Level.INFO, "Training finished");
@@ -239,7 +284,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		
 		}
 		
-//		System.out.println("error "+Arrays.toString(Arrays.copyOf(error, 500)));
+//		System.out.println("FullyConnectedLayer8="+Arrays.toString(Arrays.copyOf(error, 500))+";");
 		outputLayer.setErrors(error); 
 	}
 
