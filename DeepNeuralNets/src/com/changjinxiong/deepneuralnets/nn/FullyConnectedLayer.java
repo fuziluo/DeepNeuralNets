@@ -1,6 +1,5 @@
 package com.changjinxiong.deepneuralnets.nn;
 
-import java.util.Arrays;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -62,22 +61,15 @@ public class FullyConnectedLayer implements Layer{
 			//only fully connected layer has fixed input size at this time
 			if (previousLayer instanceof FullyConnectedLayer) {
 				//randomly initialize weights
-//				initializeWeights(0.01f, 0);
 				initializeWeights();
 				gradients = new float[weights.length];
 				weightsUpdate = new float[weights.length];
-				//TODO change the default setting
 				//initialize OpenCL 
 				if (useOpenCL) {
 					generateKernels();
 			        cl_context context = OpenCL.getContext();
-//					weightsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
-					////System.out.println("c weightsCL " + weightsCL);
 					weightsUpdateCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weightsUpdate.length* Sizeof.cl_float, Pointer.to(weightsUpdate), null);
-					////System.out.println("c weightsUpdateCL " + weightsUpdateCL);
-//					gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, gradients.length* Sizeof.cl_float, Pointer.to(gradients), null);
 					gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY, gradients.length* Sizeof.cl_float, null, null);
-					////System.out.println("c gradientsCL " + gradientsCL);
 				}
 			}
 		} else {
@@ -188,9 +180,6 @@ public class FullyConnectedLayer implements Layer{
 		for (int i = 0; i < weights.length; i++) {
 //			weights[i] = (float) (rnd.nextGaussian() / Math.sqrt(previousLayer.getNumOfNodes() / 2.0));
 			weights[i] = (float) (rnd.nextGaussian() * delta);
-//			weights[i] = (float) ((rnd.nextGaussian() + 1.96f) * delta);
-//			int n = addBias ? (i - (i+1) / (previousLayer.getNumOfNodes() + 1)) : i;
-//			weights[i] = 0.001f * (n % 10);
 		}
 		if (addBias) {
 			for (int i = previousLayer.getNumOfNodes(); i < weights.length; i += previousLayer.getNumOfNodes() + 1)
@@ -301,14 +290,12 @@ public class FullyConnectedLayer implements Layer{
 		//In the case when previous layer is a feature map, the size of output is unknown until input is fed
 		if (weights == null) {
 			//randomly initialize weights
-//			initializeWeights(0.01f, 0);
 			initializeWeights();
 			paraChanged = true;
 		}
 		if (gradients == null) {
 			gradients = new float[weights.length];
 			if (useOpenCL) {
-//				gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, gradients.length* Sizeof.cl_float, Pointer.to(gradients), null);
 				gradientsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY, gradients.length* Sizeof.cl_float, null, null);
 			}
 		}
@@ -319,7 +306,6 @@ public class FullyConnectedLayer implements Layer{
 			}
 		}
 		
-
 		int newBatchSize = previousLayer.getBatchSize();
 		if (newBatchSize != batchSize) {
 			batchSize = newBatchSize; //update batch size
@@ -330,15 +316,8 @@ public class FullyConnectedLayer implements Layer{
 			generateKernels();
 			paraChanged = false;
 		}
-		
-
-
 		if (useOpenCL) {
-//			long t1 = System.currentTimeMillis();
 			forwardPassOpenCL();
-//			long t2 = System.currentTimeMillis();
-//			System.out.println("forwardPass create act " + (t2 - t1));
-
 		} else {
 			forwardPassNoAcc();
 		}
@@ -359,19 +338,10 @@ public class FullyConnectedLayer implements Layer{
 		if (useOpenCL) {
 			if (activationsCL != null) {
 				clReleaseMemObject(activationsCL);
-				//System.out.println("R activationsCL " + activationsCL);
 			}
 			activationsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, activations.length* Sizeof.cl_float, Pointer.to(activations), null);
-			//System.out.println("c activationsCL " + activationsCL);
 		}
 	}
-	//	@Override
-	//	public float[] getErrors() {
-	//		if (previousLayer == null) { //not input layer
-	//			throw new IllegalStateException("No error on input layer!");
-	//		}		
-	//		return errors;
-	//	}
 		
 	@Override
 	public void setErrors(float[] error) {
@@ -385,57 +355,25 @@ public class FullyConnectedLayer implements Layer{
         cl_context context = OpenCL.getContext();
 		cl_command_queue commandQueue = OpenCL.getCommandQueue();
         
-   	//create arguments
-//		long t1 = System.currentTimeMillis();
-//		cl_mem arg0 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, previousLayer.getActivations().length* Sizeof.cl_float, Pointer.to(previousLayer.getActivations()), null);
 		cl_mem arg0 = previousLayer.getActivationsCL();
-//		long t2 = System.currentTimeMillis();
-//		System.out.println("clCreateBuffer prevAct " + (t2 - t1));
-		
 		cl_mem arg1 = weightsCL;
-//		cl_mem arg1 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
-//		t1 = System.currentTimeMillis();
-//		System.out.println("clCreateBuffer weights " + (t1 - t2));
 		if (activationsCL != null) {
 			clReleaseMemObject(activationsCL);
-			//System.out.println("R activationsCL " + activationsCL);
 		}
 		activationsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, batchSize * numOfPerceptron * Sizeof.cl_float, null, null);;
-		//System.out.println("c activationsCL " + activationsCL);
 		cl_mem arg2 = activationsCL;
-//		int[] arg3 = new int[] {batchSize};
-//		int[] arg4 = new int[] {numOfPerceptron};
-//		int[] arg5 = new int[] {weights.length/numOfPerceptron};
-//		int prevActivationDim = previousLayer.getNumOfNodes();
-//		int[] arg6 = new int[] {prevActivationDim};
 		//set arguments
         clSetKernelArg(kernel0, 0, Sizeof.cl_mem, Pointer.to(arg0));
         clSetKernelArg(kernel0, 1, Sizeof.cl_mem, Pointer.to(arg1));
         clSetKernelArg(kernel0, 2, Sizeof.cl_mem, Pointer.to(arg2));
-//        clSetKernelArg(kernel0, 3, Sizeof.cl_int, Pointer.to(arg3));
-//        clSetKernelArg(kernel0, 4, Sizeof.cl_int, Pointer.to(arg4));
-//        clSetKernelArg(kernel0, 5, Sizeof.cl_int, Pointer.to(arg5));
-//        clSetKernelArg(kernel0, 6, Sizeof.cl_int, Pointer.to(arg6));
-        //enqueues a command to execute a kernel on a device
-//        int groupSize = OpenCL.getGroupSize()[0];
-//    	long[] globalWorkSize = {(long) ceil((min(batchSize, 8192))/(2.0 * localWorkSizeK0[0])) * localWorkSizeK0[0], (long) ceil((min(numOfPerceptron, 8192))/(2.0 * localWorkSizeK0[1])) * localWorkSizeK0[1]};
     	long[] globalWorkSize = {(long) ceil(batchSize/(2.0 * localWorkSizeK0[0])) * localWorkSizeK0[0], (long) ceil(numOfPerceptron/(2.0 * localWorkSizeK0[1])) * localWorkSizeK0[1]};
-//        System.out.println(Arrays.toString(global_work_size));
-//        System.out.println(Arrays.toString(local_work_size));
         clEnqueueNDRangeKernel(commandQueue, kernel0, 2, null, globalWorkSize, localWorkSizeK0, 0, null, null);
-        //wait until all previously queued OpenCL commands in command_queue are issued to the associated device and have completed
         //TODO could be optimized
         clFinish(commandQueue);
-        //read data from GPU
-//		t1 = System.currentTimeMillis();
-//        clEnqueueReadBuffer(commandQueue, arg2, CL_TRUE, 0, activations.length * Sizeof.cl_float, Pointer.to(activations), 0, null, null);
-//		t2 = System.currentTimeMillis();
-//		System.out.println("clEnqueueReadBuffer activations " + (t2 - t1));
 	}
 	private void forwardPassNoAcc() {
 		activations = new float[batchSize * numOfPerceptron ];
 		float[] previousActivations = previousLayer.getActivations();
-//		int activationDim = addBiasNode()? (numOfPerceptron + 1) : numOfPerceptron;
 		int prevActivationDim = previousLayer.getNumOfNodes();
 		int weightsDim = weights.length/numOfPerceptron;
 		for (int i = 0; i < batchSize; i++) {
@@ -448,9 +386,6 @@ public class FullyConnectedLayer implements Layer{
 				}
 				activations[i*numOfPerceptron + j] = activationFunc(activationType, activations[i*numOfPerceptron + j]);
 			}
-//			if (addBiasNode()) {
-//				activations[i*activationDim + numOfPerceptron] = 1; //bias node
-//			}
 		}
 	}
 	@Override
@@ -459,19 +394,14 @@ public class FullyConnectedLayer implements Layer{
 			throw new IllegalStateException("Not backpropagation calculation on input layer!");
 		}
 
-//		System.out.println("----Timing for backpropagation----");
-//		long t1 = System.currentTimeMillis();
 		if (useOpenCL) {
 			backPropOpenCL();
 		} else {
 			backPropNoAcc();
 		}
-//		System.out.println("backpropagation total " + (System.currentTimeMillis() - t1));
-
 	}
 	
 	private void backPropOpenCL() {
-		long t1 = System.currentTimeMillis();
 		setExceptionsEnabled(true);
 
 		cl_context context = OpenCL.getContext();
@@ -490,83 +420,49 @@ public class FullyConnectedLayer implements Layer{
 		}
 		
 		cl_mem arg11 = previousLayer.getActivationsCL();
-//		cl_mem arg11 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, previousLayer.getActivations().length* Sizeof.cl_float, Pointer.to(previousLayer.getActivations()), null);
 		if (gradientsCL == null) {
 			gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, weights.length* Sizeof.cl_float, null, null);
 		}
 		cl_mem arg12 = gradientsCL;
-//		cl_mem arg12 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, gradients.length* Sizeof.cl_float, null, null);
-//		int[] arg13 = new int[] {numOfPerceptron};
 		int weightsDim = weights.length/numOfPerceptron;
-//		int[] arg14 = new int[] {weightsDim};
-//		int[] arg15 = new int[] {batchSize};
-//		int[] arg16 = new int[] {previousLayer.getNumOfNodes()};
 		clSetKernelArg(kernel1, 0, Sizeof.cl_mem, Pointer.to(arg10));
 		clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg11));
 		clSetKernelArg(kernel1, 2, Sizeof.cl_mem, Pointer.to(arg12));
-//		clSetKernelArg(kernel1, 3, Sizeof.cl_int, Pointer.to(arg13));
-//		clSetKernelArg(kernel1, 4, Sizeof.cl_int, Pointer.to(arg14));
-//		clSetKernelArg(kernel1, 5, Sizeof.cl_int, Pointer.to(arg15));
-//		clSetKernelArg(kernel1, 6, Sizeof.cl_int, Pointer.to(arg16));
-//    	long[] globalWorkSize = {(long) ceil((min(numOfPerceptron, 8192))/(2.0 * localWorkSizeK1[0])) * localWorkSizeK1[0], (long) ceil((min(weightsDim, 8192))/(2.0 * localWorkSizeK1[1])) * localWorkSizeK1[1]};
     	long[] globalWorkSize = {(long) ceil(numOfPerceptron /(2.0 * localWorkSizeK1[0])) * localWorkSizeK1[0], (long) ceil(weightsDim /(2.0 * localWorkSizeK1[1])) * localWorkSizeK1[1]};
 
 		clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
 		clFinish(commandQueue);
-		
-//		clEnqueueReadBuffer(commandQueue, arg12, CL_TRUE, 0, gradients.length * Sizeof.cl_float, Pointer.to(gradients), 0, null, null);
-		
+				
 		//clean up
 		releaseActivationsCL();
-		long t2 = System.currentTimeMillis();
-//		System.out.println("	gradient "+(t2 - t1));
 	
 		if (previousLayer.getPreviousLayer() != null) {
 			/**************************************
 			 * calculating previous error
 			 **************************************/
 			//create arguments
-//			cl_mem arg0 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, nextLayer.getErrors().length* Sizeof.cl_float, Pointer.to(nextLayer.getErrors()), null);
 			cl_mem arg0 = arg10;
 			cl_mem arg1 = weightsCL;
-//			cl_mem arg1 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
 			long prevErrSize = 1l * batchSize * previousLayer.getNumOfNodes() * Sizeof.cl_float;
 			prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, prevErrSize, null, null);
-			//System.out.println("c prevErrorsCL " + prevErrorsCL);
 			cl_mem arg2 = prevErrorsCL;
-//			cl_mem arg2 = clCreateBuffer(context, CL_MEM_READ_WRITE, prevErrors.length* Sizeof.cl_float, Pointer.to(prevErrors), null);
-//			int[] arg3 = new int[] {batchSize};
-//			int[] arg4 = new int[] {previousLayer.getNumOfNodes()};
-//			int[] arg5 = new int[] {numOfPerceptron};
-//			int[] arg6 = new int[] {weightsDim};
 			cl_mem arg7 = previousLayer.getActivationsCL();
-//			cl_mem arg7 = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, previousLayer.getActivations().length* Sizeof.cl_float, Pointer.to(previousLayer.getActivations()), null);
 			//set arguments
 			clSetKernelArg(kernel2, 0, Sizeof.cl_mem, Pointer.to(arg0));
 			clSetKernelArg(kernel2, 1, Sizeof.cl_mem, Pointer.to(arg1));
 			clSetKernelArg(kernel2, 2, Sizeof.cl_mem, Pointer.to(arg2));
-//			clSetKernelArg(kernel2, 3, Sizeof.cl_int, Pointer.to(arg3));
-//			clSetKernelArg(kernel2, 4, Sizeof.cl_int, Pointer.to(arg4));
-//			clSetKernelArg(kernel2, 5, Sizeof.cl_int, Pointer.to(arg5));
-//			clSetKernelArg(kernel2, 6, Sizeof.cl_int, Pointer.to(arg6));
 			clSetKernelArg(kernel2, 3, Sizeof.cl_mem, Pointer.to(arg7));
 			//enqueues a command to execute a kernel on a device
-//	    	globalWorkSize = new long[] {(long) ceil((min(batchSize, 8192))/(2.0 * localWorkSizeK2[0])) * localWorkSizeK2[0], (long) ceil((min(previousLayer.getNumOfNodes(), 8192))/(2.0 * localWorkSizeK2[1])) * localWorkSizeK2[1]};
 	    	globalWorkSize = new long[] {(long) ceil(batchSize /(2.0 * localWorkSizeK2[0])) * localWorkSizeK2[0], (long) ceil(previousLayer.getNumOfNodes() /(2.0 * localWorkSizeK2[1])) * localWorkSizeK2[1]};
 			clEnqueueNDRangeKernel(commandQueue, kernel2, 2, null, globalWorkSize, localWorkSizeK2, 0, null, null);
 			//TODO (could be optimized) wait until all previously queued OpenCL commands in command_queue are issued to the associated device and have completed
 			clFinish(commandQueue);
-			//read data from GPU
-			//cleanup work
-//			clReleaseMemObject(previousLayer.getActivationsCL());			
 		}
 		if (nextLayer == null) { 
 			clReleaseMemObject(arg10);
 		} else {
 			nextLayer.releasePrevErrorsCL();
 		}
-		long t3 = System.currentTimeMillis();
-//		System.out.println("	Error "+(t3 - t2));
 	}
 
 	private void backPropNoAcc() {
@@ -648,20 +544,13 @@ public class FullyConnectedLayer implements Layer{
 			    	lr = learningRate;
 			        decay = weightDecay;
 			    }
-				weightsUpdate[i] = momentum * weightsUpdate[i] - learningRate * lrMult * gradients[i]  - learningRate * weightDecay * weights[i] / batchSize;
+				weightsUpdate[i] = momentum * weightsUpdate[i] - lr * lrMult * gradients[i]  - lr * decay * weights[i] / batchSize;
 				weights[i] += weightsUpdate[i];
 				gradients[i] = 0;
 			}
 		}
 	}	
 	
-//	@Override
-//	public cl_mem getWeightCL() {
-//		if (previousLayer == null) {
-//			throw new IllegalStateException("No weights on input layer!");
-//		}	
-//		return weightsCL;
-//	}
 	@Override
 	public cl_mem getActivationsCL() {
 		return activationsCL;
@@ -688,14 +577,7 @@ public class FullyConnectedLayer implements Layer{
 	@Override
 	public void releaseCLMem() {
 		if (useOpenCL) {
-//			if (weightsCL != null) {
-//				clReleaseMemObject(weightsCL);
-//				weightsCL = null;
-//			}
-//			if (weightsUpdateCL != null) {
-//				clReleaseMemObject(weightsUpdateCL);
-//				weightsUpdateCL = null;
-//			}
+
 			if (gradientsCL != null) {
 				clReleaseMemObject(gradientsCL);
 				gradientsCL = null;
@@ -708,12 +590,6 @@ public class FullyConnectedLayer implements Layer{
 				clReleaseMemObject(prevErrorsCL);
 				prevErrorsCL = null;
 			}
-//			if (previousLayer != null) {
-//		        clReleaseKernel(kernel0);
-//		        clReleaseKernel(kernel1);
-//		        clReleaseKernel(kernel2);
-//		        clReleaseKernel(kernel3);
-//			}
 		}
 
 	}

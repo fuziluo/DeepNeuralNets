@@ -123,15 +123,12 @@ public class PoolingLayer implements FeatureMapLayer {
 		}
 		if (useOpenCL) {
 			backPropOpenCL();
-//			backPropNoAcc();
-//			prevErrorsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, prevErrors.length* Sizeof.cl_float, Pointer.to(prevErrors), null);
 		} else {
 			backPropNoAcc();
 		}
 	}
 
 	private void backPropOpenCL() {
-		// TODO Auto-generated method stub
         setExceptionsEnabled(true);
         cl_context context = OpenCL.getContext();
 		cl_command_queue commandQueue = OpenCL.getCommandQueue();
@@ -140,21 +137,12 @@ public class PoolingLayer implements FeatureMapLayer {
 		
 		long prevErrSize = 1l * batchSize * previousLayer.getNumOfNodes() * Sizeof.cl_float;
 		prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, prevErrSize, null, null);
-//		clEnqueueFillBuffer(commandQueue, prevErrorsCL, Pointer.to(new float[] {0}), 4, 0, prevErrSize, 0, null, null );
-		
-		//workarond for apple and Nvidia which don't support clEnqueueFillBuffer
-//		prevErrors = new float[batchSize * previousLayer.getNumOfNodes()];
-//		prevErrorsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, prevErrors.length* Sizeof.cl_float, Pointer.to(prevErrors), null);
-
 		cl_mem arg2 = prevErrorsCL;
 		clSetKernelArg(kernel1, 0, Sizeof.cl_mem, Pointer.to(arg0));
 		clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg1));
 		clSetKernelArg(kernel1, 2, Sizeof.cl_mem, Pointer.to(arg2));
-//		long[] globalWorkSize = {(long) ceil(outputFeatureMapsShape[0] * outputFeatureMapsShape[1] * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
-//				(long) ceil(numOfFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1]};
 		long[] globalWorkSize = {(long) ceil(inputFeatureMapsShape[0] * inputFeatureMapsShape[1] * 1.0 / localWorkSizeK1[0]) * localWorkSizeK1[0], 
 				(long) ceil(numOfFeatureMaps * 1.0 / localWorkSizeK1[1]) * localWorkSizeK1[1]};
-//		System.out.println(Arrays.toString(globalWorkSize));
 		clEnqueueNDRangeKernel(commandQueue, kernel1, 2, null, globalWorkSize, localWorkSizeK1, 0, null, null);
 		clFinish(commandQueue);
 		nextLayer.releasePrevErrorsCL();
@@ -375,9 +363,6 @@ public class PoolingLayer implements FeatureMapLayer {
 
 	@Override
 	public int getNumOfNodes() {
-//		if (outputFeatureMapsShape == null) {
-//			updateFeatureMapsShapes();
-//		}
 		int height = outputFeatureMapsShape[0];
 		int width = outputFeatureMapsShape[1];
 		return numOfFeatureMaps * (height * width);
@@ -401,27 +386,6 @@ public class PoolingLayer implements FeatureMapLayer {
 	public int[] getOutputFeatureMapsShapes() {
 		return outputFeatureMapsShape;
 	}
-
-//	private void updateFeatureMapsShapes() {
-//		int[] newShape = previousLayer.getOutputFeatureMapsShapes();
-//		if (inputFeatureMapsShape == null || inputFeatureMapsShape[0] != newShape[0] || inputFeatureMapsShape[1] != newShape[1]){
-//			inputFeatureMapsShape = newShape;
-//		
-//			//calculating output feature map size from input feature map size
-//			int h = 0, w = 0;
-//			if (inputFeatureMapsShape[0] >= poolHeight && inputFeatureMapsShape[1] >= poolWidth) {
-//				h = (inputFeatureMapsShape[0] - 1) / stride + 1;
-//				w = (inputFeatureMapsShape[1] - 1) / stride + 1;
-//	
-////				h = (inputFeatureMapsShape[0] - poolHeight) / stride + 1;
-////				w = (inputFeatureMapsShape[1] - poolWidth) / stride + 1;
-//			}			
-//			outputFeatureMapsShape = new int[] {h, w};
-//			if (useOpenCL) {
-//				generateKernels();
-//			}
-//		}
-//	}
 
 	private void generateKernels() {
 		if (kernel0 != null) {
@@ -507,8 +471,6 @@ public class PoolingLayer implements FeatureMapLayer {
 				prevErrorsCL = null;
 			}
 		}
-//        clReleaseKernel(kernel0);
-//        clReleaseKernel(kernel1);
 	}
 	@Override
 	public void releaseActivationsCL() {

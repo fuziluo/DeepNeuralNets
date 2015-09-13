@@ -16,7 +16,12 @@ public class Util {
 	    }		
 	}
 	public enum LayerType {FULLY, CONV, POOL}
-	
+	/**
+	 * Defines the calculation of different types of activation.
+	 * @param activationType
+	 * @param input
+	 * @return the calculation result
+	 */
 	public static float activationFunc(ActivationType activationType, float input) {
 		float output = input;
 		switch (activationType) {
@@ -40,6 +45,12 @@ public class Util {
 		}
 		return output;
 	}
+	/**
+	 * Defines the derivative calculation of different types of activation.
+	 * @param activationType
+	 * @param input
+	 * @return the derivative
+	 */
 	public static  float activationDerivFunc(ActivationType activationType, float input) {
 		float output = 1;
 		switch (activationType) {

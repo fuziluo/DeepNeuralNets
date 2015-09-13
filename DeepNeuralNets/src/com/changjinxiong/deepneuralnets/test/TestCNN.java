@@ -79,54 +79,6 @@ public class TestCNN {
 //		OpenCL.releaseAll();
 
 	}
-
-//	@Test
-//	public void testConvLayerForwardIrregularInputShape() {
-//		boolean useOpenCL = true;
-//		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false, useOpenCL);
-//		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 2, cl1, null, true, useOpenCL);
-//		cl1.setNextLayer(cl2);
-//		cl2.setActivationType(ActivationType.SIGMOID);
-//		int[] inputShape = {3, 5};
-//		cl1.setInputShape(inputShape);
-//		float[] inputs = {	0.1f, 0.2f, 0.3f, 0.2f, 0.3f,
-//							0.4f, 0.5f, 0.6f, 0.5f, 0.6f,
-//							0.7f, 0.8f, 0.9f, 0.8f, 0.9f,
-//							1.1f, 1.2f, 1.3f, 1.2f, 1.3f,
-//							1.4f, 1.5f, 1.6f, 1.5f, 1.6f,
-//							1.7f, 1.8f, 1.9f, 1.8f, 1.9f,
-//							2.1f, 2.2f, 2.3f, 2.2f, 2.3f,
-//							2.4f, 2.5f, 2.6f, 2.5f, 2.6f,
-//							2.7f, 2.8f, 2.9f, 2.8f, 2.9f,
-//							3.1f, 3.2f, 3.3f, 3.2f, 3.3f,
-//							3.4f, 3.5f, 3.6f, 3.5f, 3.6f,
-//							3.7f, 3.8f, 3.9f, 3.8f, 3.9f,
-//						};
-//		cl1.setInputs(inputs);
-//		float[] weights = {	0.1f, 0.2f, 
-//							0.3f, 0.4f,
-//							0.1f, 0.2f, 
-//							0.3f, 0.4f, 0.5f,
-//							0.6f, 0.7f,
-//							0.8f, 0.9f,
-//							0.6f, 0.7f,
-//							0.8f, 0.9f, 1,
-//							};
-//		cl2.setWeight(weights);
-//		cl2.forwardPass();
-//		float[] act = cl2.getActivations();
-//		float[] actCorrect = {	2.74f, 2.9f, 
-//								6.94f, 7.5f, 
-//								6.74f, 6.9f, 
-//								18.94f, 19.5f, 
-//								};
-//		for (int i = 0; i < actCorrect.length; i++) {
-//			actCorrect[i] = (float) (1 / (1 + Math.exp(-actCorrect[i])));
-//		}
-//		System.out.println(Arrays.toString(act));
-//		assertArrayEquals("!!",act,actCorrect, 0.0001f);
-////		OpenCL.releaseAll();
-//	}
 	
 	@Test
 	public void testConvLayerForwardPadding() {
@@ -362,111 +314,6 @@ public class TestCNN {
 //		OpenCL.releaseAll();
 	}
 	
-	@Test
-	public void gradientCheckReLU() {
-//		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
-//		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
-		int[][] para = new int[][] {	
-				{3, 0, 0 ,0}, 
-				{32, 5, 5, 1},
-				{3, 3, 2}, 
-				{32, 5, 5, 1},
-				{3, 3, 2}, 
-				{64, 5, 5, 1}, 
-				{3, 3, 2}, 
-				{64},
-				{10}
-				};
-		boolean addBias = true;
-		boolean useOpenCL = true;
-		int costType = 0;
-		int batchSize = 100;
-		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, true, useOpenCL);
-//		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
-//		Layer l2 = l1.getNextLayer();
-//		Layer l3 = l2.getNextLayer();
-//		Layer l4 = l3.getNextLayer();
-//		l2.setActivationType(ActivationType.RELU);
-//		l3.setActivationType(ActivationType.RELU);
-//		l4.setActivationType(ActivationType.NONE);
-
-		Layer l1 = cnn.getInputLayer();
-		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
-		PoolingLayer l3 = (PoolingLayer) l2.getNextLayer();
-		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
-		PoolingLayer l5 = (PoolingLayer) l4.getNextLayer();
-		ConvolutionalLayer l6 = (ConvolutionalLayer) l5.getNextLayer();
-		PoolingLayer l7 = (PoolingLayer) l6.getNextLayer();
-		FullyConnectedLayer l8 = (FullyConnectedLayer) l7.getNextLayer();
-		FullyConnectedLayer l9 = (FullyConnectedLayer) l8.getNextLayer();
-
-		l2.setActivationType(ActivationType.RELU);
-		l4.setActivationType(ActivationType.RELU);
-		l6.setActivationType(ActivationType.RELU);
-		l8.setActivationType(ActivationType.NONE);
-		l9.setActivationType(ActivationType.NONE);
-		l3.setPoolingType(PoolingType.AVER);
-		l5.setPoolingType(PoolingType.AVER);
-		l7.setPoolingType(PoolingType.AVER);
-		cnn.setInputShape(new int[] {32, 32});
-
-		l2.initializeWeights(0.0001f, 0);
-		l4.initializeWeights(0.01f, 0);
-		l6.initializeWeights(0.01f, 0);
-		l8.initializeWeights(0.1f, 0);
-		l9.initializeWeights(0.1f, 0);
-
-
-		
-//		cnn.setInputShape(new int[] {28, 28});
-//		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
-		String path = Paths.get(System.getProperty("user.dir"), "..", "..", "..","datasets", "CIFAR", "cifar-10-batches-bin").toString();
-		CIFAR10DataProvider tp = new CIFAR10DataProvider(path, batchSize, DatasetType.TRAINING_ALL, false);
-
-
-		
-		float[] tin = tp.getNextbatchInput();
-		float[] tout = tp.getNextBatchLabel();
-		
-		cnn.forwardPass(tin);		
-		cnn.backPropagation(tout, costType);
-		int i = 20;
-		System.out.printf(
-				"l2 weights %f gradient %f \n"
-				+ "l4 weights %f gradient %f \n"
-				+ "l6 weights %f gradient %f \n"
-				+ "l8 weights %f gradient %f \n"
-				+ "l9 weights %f gradient %f \n", 
-				l2.getWeight()[i], l2.getGradients()[i],
-				l4.getWeight()[i], l4.getGradients()[i],
-				l6.getWeight()[i], l6.getGradients()[i],
-				l8.getWeight()[i], l8.getGradients()[i],
-				l9.getWeight()[i], l9.getGradients()[i]
-				);
-		
-		Layer l = l2;
-		float g1 = l.getGradients()[i];
-		float[] weights = l.getWeight();
-		double w = weights[i];
-		double e = 0.002f;
-		weights[i] = (float) (w - e);
-		l.setWeight(weights);
-		cnn.forwardPass(tin);
-		cnn.calCostErr(tout, costType);
-		float c1 = cnn.getCost();
-		weights[i] = (float) (w + e);
-		l.setWeight(weights);
-		cnn.forwardPass(tin);
-		cnn.calCostErr(tout, costType);
-		float c2 = cnn.getCost();
-		double g2 = (c2 - c1)/(2 * e);
-		System.out.println((w - e)+" "+(w + e));
-		System.out.println(c1+" "+c2);
-		System.out.println(g1+" "+g2);
-		assertEquals(1, g2/g1, 0.0015);
-		cnn.releaseCLMem();
-//		OpenCL.releaseAll();
-	}	
 	
 	@Test
 	public void gradientCheckPadding() {
@@ -481,8 +328,8 @@ public class TestCNN {
 		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
 		ConvolutionalLayer l3 = (ConvolutionalLayer) l2.getNextLayer();
 		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
-		l2.initializeWeights(0.0125f, 0);
-		l3.initializeWeights(0.125f, 0);
+		l2.initializeWeights(0.0001f, 0);
+		l3.initializeWeights(0.25f, 0);
 		l4.initializeWeights(0.25f, 0);
 //		cnn.setInputShape(new int[] {28, 28});
 //		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
@@ -502,7 +349,7 @@ public class TestCNN {
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.001f;
+		double e = 0.0003f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
@@ -530,7 +377,6 @@ public class TestCNN {
 	@Test
 	public void testOpenCL() {
 		int[][] para = {{3, 0, 0, 0}, {2, 3, 3, 1}, {20, 3, 3, 1}, {10}};
-//		int[][] para = {{2, 0, 0, 0}, {2, 2, 2, 1}, {2, 2, 2, 1}, {10}};
 		boolean addBias = true;
 		boolean useOpenCL = false;
 		int batchSize = 10;
@@ -539,27 +385,12 @@ public class TestCNN {
 		CIFAR10DataProvider tp = new CIFAR10DataProvider(path, batchSize, DatasetType.TRAINING_ALL, false);
 		float[] tin = tp.getNextbatchInput();
 		float[] tout = tp.getNextBatchLabel();
-//		float[] tin = {	0.1f, 0.2f, 0.3f,
-//				0.4f, 0.5f, 0.6f,
-//				0.7f, 0.8f, 0.9f,
-//				1.1f, 1.2f, 1.3f,
-//				1.4f, 1.5f, 1.6f,
-//				1.7f, 1.8f, 1.9f,
-//				2.1f, 2.2f, 2.3f,
-//				2.4f, 2.5f, 2.6f,
-//				2.7f, 2.8f, 2.9f,
-//				3.1f, 3.2f, 3.3f,
-//				3.4f, 3.5f, 3.6f,
-//				3.7f, 3.8f, 3.9f,
-//			};
-//		float[] tout = new float[20];
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, false, useOpenCL);
 		Layer l1 = cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
 		Layer l3 = l2.getNextLayer();
 		Layer l4 = l3.getNextLayer();
 		cnn.setInputShape(new int[] {32, 32});
-//		cnn.setInputShape(new int[] {3, 3});
 		cnn.forwardPass(tin);
 		float[] a1 = l2.getActivations();
 		
@@ -570,7 +401,6 @@ public class TestCNN {
 		Layer l13 = l12.getNextLayer();
 		Layer l14 = l13.getNextLayer();
 		cnn1.setInputShape(new int[] {32, 32});
-//		cnn1.setInputShape(new int[] {3, 3});
 		cnn1.forwardPass(tin);
 		float[] a2 = l12.getActivations();
 //		System.out.println("a1 "+ a1.length + Arrays.toString(a1));

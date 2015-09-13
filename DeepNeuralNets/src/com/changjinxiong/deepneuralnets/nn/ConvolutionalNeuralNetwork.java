@@ -2,7 +2,6 @@ package com.changjinxiong.deepneuralnets.nn;
 
 public class ConvolutionalNeuralNetwork extends NeuralNetworkBase {
 	public ConvolutionalNeuralNetwork(int[][] layerParameters, boolean addBias, boolean padding, boolean useOpenCL) {
-		// TODO Auto-generated constructor stub
 		if (layerParameters.length < 2) {
 			throw new IllegalArgumentException("At least 2 layers");
 		}
