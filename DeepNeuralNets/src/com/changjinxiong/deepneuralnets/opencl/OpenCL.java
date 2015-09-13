@@ -16,7 +16,7 @@ import com.changjinxiong.deepneuralnets.nn.Util.LayerType;
 public final class OpenCL {
 	private final static Logger LOGGER = Logger.getLogger(OpenCL.class.getSimpleName()); 
 	private static cl_platform_id platform = platformInitializer(0);//FIXME;
-	private static cl_device_id device = deviceInitializer(0);//FIXME;
+	private static cl_device_id device = deviceInitializer(2);//FIXME;
 	private static cl_context context = contextInitializer();
 //	private static cl_program program;
 	private static cl_command_queue commandQueue = commandQueueInitializer();
@@ -60,7 +60,7 @@ public final class OpenCL {
 				+ "CL_DEVICE_MAX_COMPUTE_UNITS {4} \n", 
 				new Object[] {maxWorkGrpSize, cacheLineSize, localMemSize, workGrpMul, numOfCU});
 //		System.out.println("CL_DEVICE_MAX_WORK_GROUP_SIZE " + maxWorkGrpSize);	
-//      System.out.println("CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE " + cacheLineSize);	
+//		System.out.println("CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE " + cacheLineSize);	
 //		System.out.println("CL_DEVICE_LOCAL_MEM_SIZE " + localMemSize);
 //		System.out.printf("CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE %d\n", workGrpMul);
 
@@ -232,8 +232,9 @@ public final class OpenCL {
 				fileContent = "#define batchSize " + para[11] + "\n" + fileContent;
 				fileContent = "#define activationType " + para[12] + "\n" + fileContent;
 				fileContent = "#define prevActivationType " + para[13] + "\n" + fileContent;
-				fileContent = "#define padding " + para[14] + "\n" + fileContent;
-//				System.out.println(fileContent);
+				if (para[14] == 1) {
+					fileContent = "#define padding " + 1 + "\n" + fileContent;
+				}//				System.out.println(fileContent);
 
 			}
 		} catch (Exception e) {

@@ -27,13 +27,15 @@ public class CIFAR10DataProvider implements DataProvider {
     private float[] currentLabelsBatch;  
 	private boolean random;
 	private boolean zeroMean;
-	private float[] mean = new float[3072];;
+	private float[] mean = new float[3072];
+	private DatasetType datasetType;
     
 	public CIFAR10DataProvider(String path, int batchSize, DatasetType datasetType, boolean random) {
 		this(path, batchSize, datasetType, random, true);
 	}
 	
 	public CIFAR10DataProvider(String path, int batchSize, DatasetType datasetType, boolean random, boolean zeroMean) {
+		this.datasetType = datasetType;
 		if (datasetType == DatasetType.TRAINING_ALL) {
 			datasets = new RandomAccessFile[5];
 			try {
@@ -57,7 +59,7 @@ public class CIFAR10DataProvider implements DataProvider {
 				if (random) {
 					Collections.shuffle(indexSeq, new Random()); //fix seed here for debugging TODO
 				}	
-				//*******TODO to test more
+				//********
 				computeMean(path);
 				//********
 			} catch (FileNotFoundException e) {
@@ -81,7 +83,10 @@ public class CIFAR10DataProvider implements DataProvider {
 				this.zeroMean = zeroMean;
 				if (random) {
 					Collections.shuffle(indexSeq, new Random()); //fix seed here for debugging TODO
-				}			
+				}	
+				//********
+				computeMean(path);
+				//********
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();
 			}
@@ -110,6 +115,10 @@ public class CIFAR10DataProvider implements DataProvider {
 				e.printStackTrace();
 			}
 			return; 
+		}
+		
+		if (datasetType != DatasetType.TRAINING_ALL) {
+			throw new IllegalStateException("no mean file found, do traing first.");
 		}
 		
 		try {

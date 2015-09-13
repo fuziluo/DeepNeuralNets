@@ -98,18 +98,18 @@ void poolingBackFunc(__global float *errors, int rin, int cin, int inputFeatureM
   float der = derivative(inputFeatureMaps[inputFeatureMapsOffset + rin * inputFeatureMapsShapeW + cin]);
   // int rout = rin / stride, cout = cin / stride;
   // int r = rout * stride, c = cout * stride;
-  int r1 = max(-(poolHeight - 1) / 2, rin - poolHeight + 1);
-  int r = ((r1 + (poolHeight - 1) / 2) % stride) ? (r1 + stride - (r1 + (poolHeight - 1) / 2) % stride) : r1;
-  int c1 = max(-(poolWidth - 1) / 2, cin - poolWidth + 1);
-  int c = ((c1 + (poolWidth - 1) / 2) % stride) ? (c1 + stride - (c1 + (poolWidth - 1) / 2) % stride) : c1;
+  int r1 = max(-(poolHeight - 1) / stride / 2, rin - poolHeight + 1);
+  int r = ((r1 + (poolHeight - 1) / stride / 2) % stride) ? (r1 + stride - (r1 + (poolHeight - 1) / stride / 2) % stride) : r1;
+  int c1 = max(-(poolWidth - 1) / stride / 2, cin - poolWidth + 1);
+  int c = ((c1 + (poolWidth - 1) / stride / 2) % stride) ? (c1 + stride - (c1 + (poolWidth - 1) / stride / 2) % stride) : c1;
   switch (poolingType) {
   case AVER:
   {
-    for (int i = r; i <= rin && i < inputFeatureMapsShapeH - (poolHeight - 1) / 2; i += stride) {
-      for (int j = c; j <= cin && j < inputFeatureMapsShapeW - (poolWidth - 1) / 2; j += stride) {
+    for (int i = r; i <= rin && i < inputFeatureMapsShapeH - (poolHeight - 1) / stride / 2; i += stride) {
+      for (int j = c; j <= cin && j < inputFeatureMapsShapeW - (poolWidth - 1) / stride / 2; j += stride) {
         int cnt = (min(i + poolHeight, inputFeatureMapsShapeH) - max(i, 0)) * (min(j + poolWidth, inputFeatureMapsShapeW) - max(j, 0));
-        int rout = (i + (poolHeight - 1) / 2) / stride;
-        int cout = (j + (poolWidth - 1) / 2) / stride;
+        int rout = (i + (poolHeight - 1) / stride / 2) / stride;
+        int cout = (j + (poolWidth - 1) / stride / 2) / stride;
         *prevError += errors[outputFeatureMapsOffset + rout * outputFeatureMapsShapeW + cout] / cnt * der;
       }
     }
@@ -117,8 +117,8 @@ void poolingBackFunc(__global float *errors, int rin, int cin, int inputFeatureM
   } 
   case MAX:
   { 
-    for (int i = r; i <= rin && i < inputFeatureMapsShapeH - (poolHeight - 1) / 2; i += stride) {
-      for (int j = c; j <= cin && j < inputFeatureMapsShapeW - (poolWidth - 1) / 2; j += stride) {
+    for (int i = r; i <= rin && i < inputFeatureMapsShapeH - (poolHeight - 1) / stride / 2; i += stride) {
+      for (int j = c; j <= cin && j < inputFeatureMapsShapeW - (poolWidth - 1) / stride / 2; j += stride) {
         // float err = errors[outputFeatureMapsOffset + i / stride * outputFeatureMapsShapeW + j / stride];
         int rmax = 0, cmax = 0;
         float max_in = -FLT_MAX;
@@ -132,8 +132,8 @@ void poolingBackFunc(__global float *errors, int rin, int cin, int inputFeatureM
             }
           }
         }
-        int rout = (i + (poolHeight - 1) / 2) / stride;
-        int cout = (j + (poolWidth - 1) / 2) / stride;
+        int rout = (i + (poolHeight - 1) / stride / 2) / stride;
+        int cout = (j + (poolWidth - 1) / stride / 2) / stride;
         if (rmax == rin && cmax == cin)
           *prevError += errors[outputFeatureMapsOffset + rout * outputFeatureMapsShapeW + cout] * der;
       }
@@ -182,9 +182,10 @@ void poolingBackFunc(__global float *errors, int rin, int cin, int inputFeatureM
   switch (poolingType) {
   case AVER:
   {
-    for (int i = r; i <= rin; i += stride) {
-      for (int j = c; j <= cin; j += stride) {
-        int cnt = min(poolHeight, inputFeatureMapsShapeH - i) * min(poolWidth, inputFeatureMapsShapeW - j);
+    for (int i = r; i <= rin && i + poolHeight <= inputFeatureMapsShapeW; i += stride) {
+      for (int j = c; j <= cin && j + poolWidth <= inputFeatureMapsShapeH; j += stride) {
+        // int cnt = min(poolHeight, inputFeatureMapsShapeH - i) * min(poolWidth, inputFeatureMapsShapeW - j);
+        int cnt = poolHeight * poolWidth;
         *prevError += errors[outputFeatureMapsOffset + i / stride * outputFeatureMapsShapeW + j / stride] / cnt * der;
       }
     }
@@ -192,8 +193,8 @@ void poolingBackFunc(__global float *errors, int rin, int cin, int inputFeatureM
   } 
   case MAX:
   { 
-    for (int i = r; i <= rin; i += stride) {
-      for (int j = c; j <= cin; j += stride) {
+    for (int i = r; i <= rin && i + poolHeight <= inputFeatureMapsShapeW; i += stride) {
+      for (int j = c; j <= cin && j + poolWidth <= inputFeatureMapsShapeH; j += stride) {
         // float err = errors[outputFeatureMapsOffset + i / stride * outputFeatureMapsShapeW + j / stride];
         int rmax = i, cmax = j;
         for (int m = i; m < i + poolHeight && m < inputFeatureMapsShapeH; m++) {
@@ -230,8 +231,8 @@ __kernel void forwardPass(__global float *inputFeatureMaps, __global float *outp
       int rout = gb0 / outputFeatureMapsShapeW;
       int cout = gb0 % outputFeatureMapsShapeW;
       #ifdef padding
-      int rin = rout * stride - (poolHeight - 1) / 2;
-      int cin = cout * stride - (poolWidth - 1) / 2;
+      int rin = rout * stride - (poolHeight - 1) / stride / 2;
+      int cin = cout * stride - (poolWidth - 1) / stride / 2;
       #else
       int rin = rout * stride;
       int cin = cout * stride;
@@ -259,6 +260,8 @@ __kernel void backprop(__global float *errors, __global float *inputFeatureMaps,
 
       // poolingBackFunc(inputFeatureMaps, prevErrors, errors[outputFeatureMapsOffset + rout * outputFeatureMapsShapeW + cout], 
       //     inputFeatureMapsOffset, rin, cin);
+      prevErrors[inputFeatureMapsOffset + gb0] = 0;
+      barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
       poolingBackFunc(errors, rin, cin, inputFeatureMapsOffset, outputFeatureMapsOffset,
                       &prevErrors[inputFeatureMapsOffset + rin * inputFeatureMapsShapeW + cin], inputFeatureMaps);//
     }  

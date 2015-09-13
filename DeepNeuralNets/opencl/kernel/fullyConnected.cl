@@ -49,7 +49,7 @@ __kernel void forwardPass(__global float *preActivations, __global float *weight
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
     __local float shared_A[2 * groupSize_k0_X][groupSize_k0_Z];
-    float private_C[2][2] = {0,0,0,0};
+    float private_C[2][2] = {{0,0},{0,0}};
     __local float shared_B[groupSize_k0_Z][2 * groupSize_k0_Y];
 
     // for (int i = 2 * groupSize_k0_X * gid0; i < batchSize; i += 8192)
@@ -113,7 +113,7 @@ __kernel void backCalcGradients(__global float *error, __global float *preActiva
     int gid0 = get_group_id(0), gid1 = get_group_id(1);
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
     __local float shared_A[2 * groupSize_k1_X][groupSize_k1_Z];
-    float private_C[2][2] = {0,0,0,0};
+    float private_C[2][2] = {{0,0},{0,0}};
     __local float shared_B[groupSize_k1_Z][2 * groupSize_k1_Y];
 
     // for (int i = 2 * groupSize_k1_X * gid0; i < numOfPerceptrons; i += 8192)
@@ -181,7 +181,7 @@ __kernel void backCalcPrevErr(__global float *error, __global float *weights, __
     int lid0 = get_local_id(0), lid1 = get_local_id(1);
     __local float shared_A[2 * groupSize_k2_X][groupSize_k2_Z];
     __local float shared_B[groupSize_k2_Z][2 * groupSize_k2_Y];
-    float private_C[2][2] = {0,0,0,0};
+    float private_C[2][2] = {{0,0},{0,0}};
     // __local float shared_Act[2 * groupSize_k2_X][2 * groupSize_k2_Y];
 
     // for (int i = 2 * groupSize_k2_X * gid0; i < batchSize; i += 8192)

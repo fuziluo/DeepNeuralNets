@@ -2,6 +2,7 @@ package com.changjinxiong.deepneuralnets.test;
 
 import static org.junit.Assert.*;
 
+import java.nio.file.Paths;
 import java.util.Arrays;
 
 import org.junit.After;
@@ -295,9 +296,8 @@ public class TestMLP {
 		
 		assertArrayEquals("Initial check wrong l2", new float[] {0.1f, 0.2f, 0.3f, 0.4f}, l2.getWeight(), 0.00001f);
 		assertArrayEquals("Initial check wrong l3", new float[] {0.1f, 0.2f}, l3.getWeight(), 0.00001f);
-
-		
-		String path = "/home/jxchang/project/DeepLearningInJava/DeepNeuralNets/DeepNeuralNets/test/.MultiLayerPerceptron.weights";
+        
+		String path = Paths.get(System.getProperty("user.dir"), "test", ".MultiLayerPerceptron.weights").toString();
 		mlp.saveWeights(path);
 	
 		l3.setWeight(new float[] {1.1f, 1.2f});

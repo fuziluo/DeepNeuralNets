@@ -123,6 +123,8 @@ public class PoolingLayer implements FeatureMapLayer {
 		}
 		if (useOpenCL) {
 			backPropOpenCL();
+//			backPropNoAcc();
+//			prevErrorsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, prevErrors.length* Sizeof.cl_float, Pointer.to(prevErrors), null);
 		} else {
 			backPropNoAcc();
 		}
@@ -135,9 +137,15 @@ public class PoolingLayer implements FeatureMapLayer {
 		cl_command_queue commandQueue = OpenCL.getCommandQueue();
 		cl_mem arg0 = nextLayer.getPrevErrorsCL();
 		cl_mem arg1 = previousLayer.getActivationsCL();
+		
 		long prevErrSize = 1l * batchSize * previousLayer.getNumOfNodes() * Sizeof.cl_float;
 		prevErrorsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, prevErrSize, null, null);
-		clEnqueueFillBuffer(commandQueue, prevErrorsCL, Pointer.to(new float[] {0}), 1, 0, prevErrSize, 0, null, null );
+//		clEnqueueFillBuffer(commandQueue, prevErrorsCL, Pointer.to(new float[] {0}), 4, 0, prevErrSize, 0, null, null );
+		
+		//workarond for apple and Nvidia which don't support clEnqueueFillBuffer
+//		prevErrors = new float[batchSize * previousLayer.getNumOfNodes()];
+//		prevErrorsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, prevErrors.length* Sizeof.cl_float, Pointer.to(prevErrors), null);
+
 		cl_mem arg2 = prevErrorsCL;
 		clSetKernelArg(kernel1, 0, Sizeof.cl_mem, Pointer.to(arg0));
 		clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg1));
@@ -165,8 +173,8 @@ public class PoolingLayer implements FeatureMapLayer {
 				int outputFeatureMapsOffset = outputBatchOffest + j * outputFeatureMapsShape[0] * outputFeatureMapsShape[1];
 				for (int rout = 0; rout < outputFeatureMapsShape[0]; rout ++) {
 					for (int cout = 0; cout < outputFeatureMapsShape[1]; cout ++) {
-						int rin = rout * stride - (padding ? (poolHeight - 1) / 2 : 0);
-						int cin = cout * stride - (padding ? (poolWidth - 1) / 2 : 0);
+						int rin = rout * stride - (padding ? (poolHeight - 1) / stride / 2 : 0);
+						int cin = cout * stride - (padding ? (poolWidth - 1) / stride / 2 : 0);
 						poolingBackFunc(preAct, prevErrors, errors[outputFeatureMapsOffset + rout * outputFeatureMapsShape[1] + cout], 
 								inputFeatureMapsOffset, rin, cin);
 					}
@@ -266,8 +274,8 @@ public class PoolingLayer implements FeatureMapLayer {
 				int outputFeatureMapsOffset = outputBatchOffest + j * outputFeatureMapsShape[0] * outputFeatureMapsShape[1];
 				for (int rout = 0; rout < outputFeatureMapsShape[0]; rout ++) {
 					for (int cout = 0; cout < outputFeatureMapsShape[1]; cout ++) {
-						int rin = rout * stride - (padding ? (poolHeight - 1) / 2 : 0);
-						int cin = cout * stride - (padding ? (poolWidth - 1) / 2 : 0);
+						int rin = rout * stride - (padding ? (poolHeight - 1) / stride / 2 : 0);
+						int cin = cout * stride - (padding ? (poolWidth - 1) / stride / 2 : 0);
 						activations[outputFeatureMapsOffset + rout * outputFeatureMapsShape[1] + cout] = 
 								poolingFunc(preAct, inputFeatureMapsOffset, rin, cin);
 					}

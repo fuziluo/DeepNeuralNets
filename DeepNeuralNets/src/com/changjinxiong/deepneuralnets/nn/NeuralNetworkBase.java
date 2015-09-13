@@ -50,12 +50,17 @@ public class NeuralNetworkBase implements NeuralNetwork {
 	public void forwardPass(float[] inputSamples) {
 		inputLayer.setInputs(inputSamples); //provide input data
 		Layer currentLayer = inputLayer;
+//		System.out.println(Arrays.copyOfRange(currentLayer.getActivations(), 0,Math.min(1000000000, currentLayer.getActivations().length)).length);
+//		System.out.println("input data = "+Arrays.toString(Arrays.copyOfRange(currentLayer.getActivations(), 0,Math.min(1000000000, currentLayer.getActivations().length))));
+		int n=0;
 		while (currentLayer.getNextLayer() != null) {
 			currentLayer = currentLayer.getNextLayer();
 			long t = System.currentTimeMillis();
 			currentLayer.forwardPass();
-//			System.out.println("Activations"+Arrays.toString(currentLayer.getActivations()));
+//			System.out.println(Arrays.copyOfRange(currentLayer.getActivations(), 0,Math.min(1000000000, currentLayer.getActivations().length)).length);
+//			System.out.println(currentLayer.getClass().getSimpleName() + n +"="+Arrays.toString(Arrays.copyOfRange(currentLayer.getActivations(), 0,Math.min(1000000000, currentLayer.getActivations().length))));
 //			System.out.printf("  forward %s %dms \n", currentLayer.getClass().getSimpleName(), (System.currentTimeMillis() - t));
+			n++;
 		}
 	}
 	/* (non-Javadoc)
@@ -85,13 +90,23 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			t = System.currentTimeMillis();
 //			if (n==3||n==4)
 //			System.out.println(currentLayer.getClass().getSimpleName() + n +"="+Arrays.toString(Arrays.copyOfRange(currentLayer.getActivations(), 0,Math.min(3000, currentLayer.getActivations().length)))+";");
-
+//			System.out.println("******"+currentLayer.getClass().getSimpleName()+n+"********");
+//				if (currentLayer.getGradients() != null) {
+//				if(n != 0) {
+//					System.out.println(currentLayer.getPreviousLayer().getActivations().length+"\n"
+//					+"activation= "+Arrays.toString(currentLayer.getPreviousLayer().getActivations()));
+//				}
+//				if(n != 8){
+//					System.out.println(currentLayer.getNextLayer().getPrevErrors().length+"\n"
+//					+"errors= "+Arrays.toString(currentLayer.getNextLayer().getPrevErrors()));
+//				}
+//			}
 			currentLayer.backpropagation();
 			if (currentLayer.getGradients() != null) {
 //				System.out.println("gradients: "+currentLayer.getClass().getSimpleName()+currentLayer.getGradients().length+Arrays.toString(Arrays.copyOf(currentLayer.getGradients(), Math.min(3000, currentLayer.getGradients().length))));
-//				System.out.println(currentLayer.getClass().getSimpleName()+n+"="+Arrays.toString(Arrays.copyOf(currentLayer.getGradients(), Math.min(3000, currentLayer.getGradients().length)))+";");
-//				System.out.println();
-//				System.out.println("weights: "+currentLayer.getClass().getSimpleName()+currentLayer.getWeight().length+Arrays.toString(Arrays.copyOf(currentLayer.getWeight(), 500)));
+//				System.out.println(currentLayer.getGradients().length);
+//				System.out.println("gradients="+Arrays.toString(Arrays.copyOf(currentLayer.getGradients(), Math.min(30000000, currentLayer.getGradients().length)))+";");
+//				System.out.println("weights="+Arrays.toString(currentLayer.getWeight()));
 //				System.out.println();
 			}
 //			if(currentLayer.getPreviousLayer().getPreviousLayer() == null) {
@@ -212,12 +227,8 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		for (int i = 0, j = 0, k = 0, l = 0; i < dp.getDatasetSize() * maxEpoch; i += dp.getBatchSize()) {
 			forwardPass(dp.getNextbatchInput());
 			//monitor the cost
-			long t = System.currentTimeMillis();
 			float [] batchLabels = dp.getNextBatchLabel();
-//			calCostErr(batchLabels, costType);
-//			System.out.printf("  calc cost %dms \n", (System.currentTimeMillis() - t));
 			backPropagation(batchLabels, costType);
-			
 			averageCost += cost;
 //			System.out.println(cost);
 			j++;
@@ -244,7 +255,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 				l = 0;
 			}
 			updateWeights(lr, momentum, weightDecay);	
-			if(i >= 0) break;
+//			if(i >= 0) break;
 		} 
 		releaseCLMem();
 		LOGGER.log(Level.INFO, "Training finished");
@@ -284,7 +295,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		
 		}
 		
-//		System.out.println("FullyConnectedLayer8="+Arrays.toString(Arrays.copyOf(error, 500))+";");
+//		System.out.println(error.length+"\n errors="+Arrays.toString(error)+";");
 		outputLayer.setErrors(error); 
 	}
 
@@ -311,6 +322,13 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			for (int i = 0; i < labelSize; i++) {
 				actSoftmax[j * labelSize + i] = (float) (Math.exp(activations[j * labelSize + i] - sum));
 //				System.out.println(actSoftmax[j * labelSize + i]);
+			}
+			float denom = 0;
+			for (int i = 0; i < labelSize; i++) {
+				denom += actSoftmax[j * labelSize + i];
+			}
+			for (int i = 0; i < labelSize; i++) {
+				actSoftmax[j * labelSize + i] /= denom;
 			}
 		}
 //		System.out.println("actSoftmax"+Arrays.toString(actSoftmax));

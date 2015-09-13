@@ -8,6 +8,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.logging.Level;
@@ -20,6 +21,8 @@ import javax.swing.JLabel;
 
 import org.junit.Test;
 
+import com.changjinxiong.deepneuralnets.nn.PoolingLayer;
+import com.changjinxiong.deepneuralnets.nn.PoolingLayer.PoolingType;
 import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 import com.changjinxiong.deepneuralnets.nn.ConvolutionalNeuralNetwork;
 import com.changjinxiong.deepneuralnets.nn.Layer;
@@ -403,7 +406,7 @@ public class TestMnist {
 		boolean useOpenCL = true;
 		boolean addBias = true;
 		boolean padding = false;
-		int batchSize = 100;
+		int batchSize = 50;
 		MnistDataProvider trainingSet = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
 		MnistDataProvider testSet = new MnistDataProvider("test/t10k-images-idx3-ubyte", "test/t10k-labels-idx1-ubyte", 10000, false);
 		int costType = 0; 
@@ -412,22 +415,24 @@ public class TestMnist {
 		float weightDecay = 0;//0.001f;
 		int lrChangeCycle = 30 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
 		float lrChangeRate = 0.1f;
-		int epoch = 40;
+		int epoch = 5;
 		int[][] cnnLayers = new int[][] {{1, 0, 0 ,0}, {20, 5, 5, 1},{2, 2, 2}, {50, 5, 5, 1},{2, 2, 2}, {500}, {10}};
 		String path = "/home/jxchang/project/records/mnist/.cnn.weights";
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
 		cnn.setInputShape(new int[] {28, 28});
 		Layer l1 = cnn.getInputLayer();
 		Layer l2 = l1.getNextLayer();
-		Layer l3 = l2.getNextLayer();
+		PoolingLayer l3 = (PoolingLayer) l2.getNextLayer();
 		Layer l4 = l3.getNextLayer();
-		Layer l5 = l4.getNextLayer();
+		PoolingLayer l5 = (PoolingLayer) l4.getNextLayer();
 		Layer l6 = l5.getNextLayer();
 		Layer l7 = l6.getNextLayer();
 		l2.setActivationType(ActivationType.SIGMOID);
 		l4.setActivationType(ActivationType.SIGMOID);
 		l6.setActivationType(ActivationType.SIGMOID);
 		l7.setActivationType(ActivationType.SIGMOID);
+//		l3.setPoolingType(PoolingType.AVER);
+//		l5.setPoolingType(PoolingType.AVER);
 		Logger logger = Logger.getLogger("MNIST traing with CNN");
 		logger.log(Level.INFO, "CNN architecture: \n"
 				+ "{0} {1} bias \n"
@@ -451,7 +456,7 @@ public class TestMnist {
 		logger.log(Level.INFO, "Pretest before training...");
 //		cnn.test(trainingSet);
 //		cnn.test(testSet);
-//		cnn.loadWeights(path);
+//		cnn.loadWeights("/Users/jxchang/project/records/mnist/.cnn.weights");
 		cnn.test(testSet);
 		
 		float errorRate = 0;
@@ -464,7 +469,7 @@ public class TestMnist {
 		
 		cnn.test(trainingSet);
 
-		logger.log(Level.INFO, "Saving weights...");
+//		logger.log(Level.INFO, "Saving weights...");/
 //		cnn.saveWeights(path);
 		assertEquals(0, errorRate, 0.01);	
 
@@ -476,7 +481,7 @@ public class TestMnist {
 		boolean useOpenCL = true;
 		boolean addBias = true;
 		boolean padding = false;
-		int batchSize = 1000;
+		int batchSize = 100;
 		MnistDataProvider trainingSet = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
 		MnistDataProvider testSet = new MnistDataProvider("test/t10k-images-idx3-ubyte", "test/t10k-labels-idx1-ubyte", batchSize, false);
 		int costType = 0;
@@ -494,7 +499,7 @@ public class TestMnist {
 										{500}, 
 										{10}
 										};
-		String path = "/home/jxchang/project/records/mnist/.cnnReLU.weights";
+		String path = Paths.get(System.getProperty("user.dir"), "..", "..", "..","records", "mnist", ".cnnReLU.weights").toString();
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
 		cnn.setInputShape(new int[] {28, 28});
 		Layer l1 = cnn.getInputLayer();
@@ -567,7 +572,7 @@ public class TestMnist {
 //		mlp.test(mnistTest);
 		int costType = 0; //cross entropy
 		int epoch = 10;
-		float baselearningRate = 0.0001f;
+		float baselearningRate = 0.05f;
 		float momentum = 0.9f;
 		float weightDecay = 0;
 		int lrChangeCycle = 3 * mnistTraining.getDatasetSize() / mnistTraining.getBatchSize();
@@ -595,9 +600,10 @@ public class TestMnist {
 		assertEquals(0, errorRate, 0.07);
 		
 		logger.log(Level.INFO, "Saving weights...");
-		String path = "/home/jxchang/project/records/mnist/.mlpReLU.weights";
+		String path = Paths.get(System.getProperty("user.dir"), "..", "..", "..","records", "mnist", ".mlpReLU.weights").toString();
+//		String path = "/home/jxchang/project/records/mnist/.mlpReLU.weights";
 		mlp.saveWeights(path);
-		logger.log(Level.INFO, "Weights saved to " + path);
+//		logger.log(Level.INFO, "Weights saved to " + path);
 
 	}
 }

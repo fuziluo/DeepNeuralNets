@@ -80,53 +80,53 @@ public class TestCNN {
 
 	}
 
-	@Test
-	public void testConvLayerForwardIrregularInputShape() {
-		boolean useOpenCL = true;
-		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false, useOpenCL);
-		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 2, cl1, null, true, useOpenCL);
-		cl1.setNextLayer(cl2);
-		cl2.setActivationType(ActivationType.SIGMOID);
-		int[] inputShape = {3, 5};
-		cl1.setInputShape(inputShape);
-		float[] inputs = {	0.1f, 0.2f, 0.3f, 0.2f, 0.3f,
-							0.4f, 0.5f, 0.6f, 0.5f, 0.6f,
-							0.7f, 0.8f, 0.9f, 0.8f, 0.9f,
-							1.1f, 1.2f, 1.3f, 1.2f, 1.3f,
-							1.4f, 1.5f, 1.6f, 1.5f, 1.6f,
-							1.7f, 1.8f, 1.9f, 1.8f, 1.9f,
-							2.1f, 2.2f, 2.3f, 2.2f, 2.3f,
-							2.4f, 2.5f, 2.6f, 2.5f, 2.6f,
-							2.7f, 2.8f, 2.9f, 2.8f, 2.9f,
-							3.1f, 3.2f, 3.3f, 3.2f, 3.3f,
-							3.4f, 3.5f, 3.6f, 3.5f, 3.6f,
-							3.7f, 3.8f, 3.9f, 3.8f, 3.9f,
-						};
-		cl1.setInputs(inputs);
-		float[] weights = {	0.1f, 0.2f, 
-							0.3f, 0.4f, 0.5f,
-							0.1f, 0.2f, 
-							0.3f, 0.4f, 0.5f,
-							0.6f, 0.7f,
-							0.8f, 0.9f, 1,
-							0.6f, 0.7f,
-							0.8f, 0.9f, 1,
-							};
-		cl2.setWeight(weights);
-		cl2.forwardPass();
-		float[] act = cl2.getActivations();
-		float[] actCorrect = {	2.74f, 2.9f, 
-								6.94f, 7.5f, 
-								6.74f, 6.9f, 
-								18.94f, 19.5f, 
-								};
-		for (int i = 0; i < actCorrect.length; i++) {
-			actCorrect[i] = (float) (1 / (1 + Math.exp(-actCorrect[i])));
-		}
-		System.out.println(Arrays.toString(act));
-		assertArrayEquals("!!",act,actCorrect, 0.0001f);
-//		OpenCL.releaseAll();
-	}
+//	@Test
+//	public void testConvLayerForwardIrregularInputShape() {
+//		boolean useOpenCL = true;
+//		ConvolutionalLayer cl1 = new ConvolutionalLayer(2, 0, 0, 0, null, null, false, useOpenCL);
+//		ConvolutionalLayer cl2 = new ConvolutionalLayer(2, 2, 2, 2, cl1, null, true, useOpenCL);
+//		cl1.setNextLayer(cl2);
+//		cl2.setActivationType(ActivationType.SIGMOID);
+//		int[] inputShape = {3, 5};
+//		cl1.setInputShape(inputShape);
+//		float[] inputs = {	0.1f, 0.2f, 0.3f, 0.2f, 0.3f,
+//							0.4f, 0.5f, 0.6f, 0.5f, 0.6f,
+//							0.7f, 0.8f, 0.9f, 0.8f, 0.9f,
+//							1.1f, 1.2f, 1.3f, 1.2f, 1.3f,
+//							1.4f, 1.5f, 1.6f, 1.5f, 1.6f,
+//							1.7f, 1.8f, 1.9f, 1.8f, 1.9f,
+//							2.1f, 2.2f, 2.3f, 2.2f, 2.3f,
+//							2.4f, 2.5f, 2.6f, 2.5f, 2.6f,
+//							2.7f, 2.8f, 2.9f, 2.8f, 2.9f,
+//							3.1f, 3.2f, 3.3f, 3.2f, 3.3f,
+//							3.4f, 3.5f, 3.6f, 3.5f, 3.6f,
+//							3.7f, 3.8f, 3.9f, 3.8f, 3.9f,
+//						};
+//		cl1.setInputs(inputs);
+//		float[] weights = {	0.1f, 0.2f, 
+//							0.3f, 0.4f,
+//							0.1f, 0.2f, 
+//							0.3f, 0.4f, 0.5f,
+//							0.6f, 0.7f,
+//							0.8f, 0.9f,
+//							0.6f, 0.7f,
+//							0.8f, 0.9f, 1,
+//							};
+//		cl2.setWeight(weights);
+//		cl2.forwardPass();
+//		float[] act = cl2.getActivations();
+//		float[] actCorrect = {	2.74f, 2.9f, 
+//								6.94f, 7.5f, 
+//								6.74f, 6.9f, 
+//								18.94f, 19.5f, 
+//								};
+//		for (int i = 0; i < actCorrect.length; i++) {
+//			actCorrect[i] = (float) (1 / (1 + Math.exp(-actCorrect[i])));
+//		}
+//		System.out.println(Arrays.toString(act));
+//		assertArrayEquals("!!",act,actCorrect, 0.0001f);
+////		OpenCL.releaseAll();
+//	}
 	
 	@Test
 	public void testConvLayerForwardPadding() {
@@ -307,7 +307,7 @@ public class TestCNN {
 //		int[][] para = {{1, 0, 0, 0}, {2, 3, 3, 1}, {2, 3, 3, 1}, {10}};
 		int[][] para = {{3, 0, 0, 0}, {3, 3, 3, 1}, {4, 3, 3, 1}, {4, 3, 3, 1}, {10}};
 		boolean addBias = true;
-		boolean useOpenCL = false;
+		boolean useOpenCL = true;
 		int costType = 0;
 		int batchSize = 10;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, false, useOpenCL);
@@ -410,11 +410,11 @@ public class TestCNN {
 		l7.setPoolingType(PoolingType.AVER);
 		cnn.setInputShape(new int[] {32, 32});
 
-		l2.initializeWeights(0.001f, 0);
-		l4.initializeWeights(0.1f, 0);
-		l6.initializeWeights(0.1f, 0);
-		l8.initializeWeights(1f, 0);
-		l9.initializeWeights(1f, 0);
+		l2.initializeWeights(0.0001f, 0);
+		l4.initializeWeights(0.01f, 0);
+		l6.initializeWeights(0.01f, 0);
+		l8.initializeWeights(0.1f, 0);
+		l9.initializeWeights(0.1f, 0);
 
 
 		
@@ -430,7 +430,7 @@ public class TestCNN {
 		
 		cnn.forwardPass(tin);		
 		cnn.backPropagation(tout, costType);
-		int i = 0;
+		int i = 20;
 		System.out.printf(
 				"l2 weights %f gradient %f \n"
 				+ "l4 weights %f gradient %f \n"
@@ -444,11 +444,11 @@ public class TestCNN {
 				l9.getWeight()[i], l9.getGradients()[i]
 				);
 		
-		Layer l = l6;
+		Layer l = l2;
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.001f;
+		double e = 0.002f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);

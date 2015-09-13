@@ -184,11 +184,13 @@ public class FullyConnectedLayer implements Layer{
 	public void initializeWeights(float delta, float bias) {
 		int weightLength = previousLayer.getNumOfNodes() + (addBias ? 1 : 0);
 		weights = new float[numOfPerceptron * weightLength];
-		Random rnd = new Random(0);
+		Random rnd = new Random(0); //fixed seed
 		for (int i = 0; i < weights.length; i++) {
 //			weights[i] = (float) (rnd.nextGaussian() / Math.sqrt(previousLayer.getNumOfNodes() / 2.0));
 			weights[i] = (float) (rnd.nextGaussian() * delta);
 //			weights[i] = (float) ((rnd.nextGaussian() + 1.96f) * delta);
+//			int n = addBias ? (i - (i+1) / (previousLayer.getNumOfNodes() + 1)) : i;
+//			weights[i] = 0.001f * (n % 10);
 		}
 		if (addBias) {
 			for (int i = previousLayer.getNumOfNodes(); i < weights.length; i += previousLayer.getNumOfNodes() + 1)

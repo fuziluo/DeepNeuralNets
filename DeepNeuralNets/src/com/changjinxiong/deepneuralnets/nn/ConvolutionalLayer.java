@@ -186,12 +186,13 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 
 	public void initializeWeights(float delta, float bias) {
 		weights = new float[numOfOutputFeatureMaps * (numOfInputFeatureMaps * filterHeight * filterWidth + (addBias ? 1 : 0))];
-		Random rnd = new Random(0);
+		Random rnd = new Random(0);//TODO fixed seed
 		for (int i = 0; i < weights.length; i++) {
 //			weights[i] = (float) (rnd.nextGaussian() / Math.sqrt(filterHeight * filterWidth * numOfInputFeatureMaps/ 2.0));
 			weights[i] = (float) (rnd.nextGaussian() * delta );
 //			weights[i] = (float) ((rnd.nextGaussian() + 1.96f) * delta);
-
+//			int n = addBias ? (i - (i+1) / (numOfInputFeatureMaps * filterHeight * filterWidth + 1)) : i;
+//			weights[i] = 0.001f * (n % 10);
 		}
 		int weightsDim = numOfInputFeatureMaps * filterHeight * filterWidth + (addBias ? 1 : 0);
 		if (addBias) {
@@ -462,7 +463,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			gradientsCL = clCreateBuffer(context, CL_MEM_READ_WRITE, gradients.length* Sizeof.cl_float, null, null);
 		}	
 		//necessary for the kernel using local mem as buffer
-		clEnqueueFillBuffer(commandQueue, gradientsCL, Pointer.to(new float[] {0}), 1, 0, gradients.length* Sizeof.cl_float, 0, null, null );
+//		clEnqueueFillBuffer(commandQueue, gradientsCL, Pointer.to(new float[] {0}), 1, 0, gradients.length* Sizeof.cl_float, 0, null, null );
 		cl_mem arg2 = gradientsCL;
 		clSetKernelArg(kernel1, 0, Sizeof.cl_mem, Pointer.to(arg0));
 		clSetKernelArg(kernel1, 1, Sizeof.cl_mem, Pointer.to(arg1));
