@@ -10,18 +10,8 @@ import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
  *
  */
 public interface Layer {
-	/**
-	 * Method used to update the weight of this layer in each iteration
-	 * @param learningRate
-	 * @param momentum
-	 * @param weightDecay
-	 */
-	public void updateWeights(float learningRate, float momentum, float weightDecay);
-	/**
-	 * Method used to load provided weight to the layer.
-	 * @param weights
-	 */
-	public void setWeight(float[] weights);	
+
+	
 	/**
 	 * performs Back propagation calculation of the current layer, used in training.
 	 */
@@ -51,11 +41,7 @@ public interface Layer {
 	 * @param nextLayer
 	 */
 	public void setNextLayer(Layer nextLayer);
-	/**
-	 * 
-	 * @return the weights of the current layer as a array
-	 */
-	public float[] getWeight();
+
 	/**
 	 * Get the result of the forward pass calculation
 	 * @return activations (the result of the forward pass calculation)
@@ -123,4 +109,6 @@ public interface Layer {
 	 * Used to release the all GPU memory used for this layer.
 	 */
 	public void releaseCLMem();
+
+
 }

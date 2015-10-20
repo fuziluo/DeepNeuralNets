@@ -17,6 +17,7 @@ import com.changjinxiong.deepneuralnets.nn.NeuralNetwork;
 import com.changjinxiong.deepneuralnets.nn.PoolingLayer;
 import com.changjinxiong.deepneuralnets.nn.PoolingLayer.PoolingType;
 import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
+import com.changjinxiong.deepneuralnets.nn.WeightLayer;
 import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 import com.changjinxiong.deepneuralnets.test.CIFAR10DataProvider.DatasetType;
 
@@ -148,10 +149,10 @@ public class TestCNN {
 		boolean useOpenCL = false;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, false, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
-		Layer l2 = l1.getNextLayer();
-		Layer l3 = l2.getNextLayer();
-		Layer l4 = l3.getNextLayer();
-		Layer l5 = l4.getNextLayer();
+		WeightLayer l2 = (WeightLayer) l1.getNextLayer();
+		WeightLayer l3 = (WeightLayer) l2.getNextLayer();
+		WeightLayer l4 = (WeightLayer) l3.getNextLayer();
+		WeightLayer l5 = (WeightLayer) l4.getNextLayer();
 		l1.setInputShape(new int[] {4, 4});
 
 		assertEquals(l2.getWeight().length, 76, 0);
@@ -195,8 +196,8 @@ public class TestCNN {
 		boolean useOpenCL = true;
 		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(para, addBias, false, useOpenCL);
 		FeatureMapLayer l1 = (FeatureMapLayer) cnn.getInputLayer();
-		Layer l2 = l1.getNextLayer();
-		Layer l3 = l2.getNextLayer();
+		WeightLayer l2 = (WeightLayer) l1.getNextLayer();
+		WeightLayer l3 = (WeightLayer) l2.getNextLayer();
 		cnn.setInputShape(new int[] {4, 4});
 		assertEquals(l2.getWeight().length, 38, 0);
 //		assertNull(l3.getWeight());
@@ -267,9 +268,9 @@ public class TestCNN {
 		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
 		ConvolutionalLayer l3 = (ConvolutionalLayer) l2.getNextLayer();
 		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
-		l2.initializeWeights(0.0001f, 0);
-		l3.initializeWeights(0.25f, 0);
-		l4.initializeWeights(0.25f, 0);
+		l2.initWeightsGaussian(0.0001f, 0, 0);
+		l3.initWeightsGaussian(0.25f, 0, 0);
+		l4.initWeightsGaussian(0.25f, 0, 0);
 //		cnn.setInputShape(new int[] {28, 28});
 //		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
 		cnn.setInputShape(new int[] {32, 32});
@@ -284,7 +285,7 @@ public class TestCNN {
 		
 		cnn.backPropagation(tout, costType);
 		int i = 27; //the index of bias
-		Layer l = l2;
+		WeightLayer l = l2;
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
@@ -328,9 +329,9 @@ public class TestCNN {
 		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
 		ConvolutionalLayer l3 = (ConvolutionalLayer) l2.getNextLayer();
 		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
-		l2.initializeWeights(0.0001f, 0);
-		l3.initializeWeights(0.25f, 0);
-		l4.initializeWeights(0.25f, 0);
+		l2.initWeightsGaussian(0.0001f, 0, 0);
+		l3.initWeightsGaussian(0.25f, 0, 0);
+		l4.initWeightsGaussian(0.25f, 0, 0);
 //		cnn.setInputShape(new int[] {28, 28});
 //		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
 		cnn.setInputShape(new int[] {32, 32});
@@ -345,7 +346,7 @@ public class TestCNN {
 		
 		cnn.backPropagation(tout, costType);
 		int i = 10;
-		Layer l = l2;
+		WeightLayer l = l2;
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];

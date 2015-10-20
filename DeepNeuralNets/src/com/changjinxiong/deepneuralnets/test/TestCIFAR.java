@@ -55,7 +55,7 @@ public class TestCIFAR {
 		frame.getContentPane().setVisible(true);
 		frame.setVisible(true);
 		String p = Paths.get(System.getProperty("user.dir"), "..", "..", "..","datasets", "CIFAR", "cifar-10-batches-bin").toString();
-		CIFAR10DataProvider cp = new CIFAR10DataProvider(p, 1, DatasetType.TEST, false, true);
+		CIFAR10DataProvider cp = new CIFAR10DataProvider(p, 1, DatasetType.TRAINING_ALL, false, true, false);
 		int width = 32;
 		int height = 32;
 		String[] labels= {"airplane", 
@@ -194,7 +194,7 @@ public class TestCIFAR {
 		cnn.test(cp1);
 		
 		
-		CIFAR10DataProvider cp = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", 1, DatasetType.TEST, false, false);
+		CIFAR10DataProvider cp = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", 1, DatasetType.TEST, false, false, false);
 //		CIFAR10DataProvider cp2 = new CIFAR10DataProvider("/home/jxchang/project/datasets/CIFAR/cifar-10-batches-bin", 1, DatasetType.TRAINING_ALL, false);
 		int width = 32;
 		int height = 32;
@@ -271,12 +271,11 @@ public class TestCIFAR {
 	}
 	
 	@Test
-	public void TrainCNNReLU() {
+	public void trainCNNReLUCaffe() {
 		boolean useOpenCL = true;
 		boolean addBias = true;
 		boolean padding = true;
 		int batchSize = 100;
-//		int batchSize = 1;//TODO
 		String p = Paths.get(System.getProperty("user.dir"), "..", "..", "..","datasets", "CIFAR", "cifar-10-batches-bin").toString();
 
 		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider(p, batchSize, DatasetType.TRAINING_ALL, false);
@@ -325,11 +324,11 @@ public class TestCIFAR {
 //		l2.setPadding(false);
 		cnn.setInputShape(new int[] {32, 32});
 		
-		l2.initializeWeights(0.0001f, 0);
-		l4.initializeWeights(0.01f, 0f);
-		l6.initializeWeights(0.01f, 0);
-		l8.initializeWeights(0.1f, 0);
-		l9.initializeWeights(0.1f, 0);		
+		l2.initWeightsGaussian(0.0001f, 0, 0);
+		l4.initWeightsGaussian(0.01f, 0, 0);
+		l6.initWeightsGaussian(0.01f, 0, 0);
+		l8.initWeightsGaussian(0.1f, 0, 0);
+		l9.initWeightsGaussian(0.1f, 0, 0);		
 
 //		l2.setLearningRateMultiplication(2f);
 //		l4.setLearningRateMultiplication(2.5f);
@@ -376,6 +375,113 @@ public class TestCIFAR {
 //		assertEquals(0, errorRate, 0.1);	
 
 	}
+	
+	
+	@Test
+	public void trainCNN() {
+		boolean useOpenCL = true;
+		boolean addBias = true;
+		boolean padding = true;
+		int batchSize = 100;
+		String p = Paths.get(System.getProperty("user.dir"), "..", "..", "..","datasets", "CIFAR", "cifar-10-batches-bin").toString();
+
+		CIFAR10DataProvider trainingSet = new CIFAR10DataProvider(p, batchSize, DatasetType.TRAINING_ALL, false, true, true);
+		CIFAR10DataProvider testSet = new CIFAR10DataProvider(p, 2000, DatasetType.TEST, false, true, true);
+		int costType = 0; 
+		float baselearningRate = 0.05f;
+		float momentum = 0.8f;
+		float weightDecay = 0.1f;//0.004f;
+		int lrChangeCycle = 0;//1 * trainingSet.getDatasetSize()/trainingSet.getBatchSize();
+		float lrChangeRate = 0.15f;
+		int epoch = 10;
+		int[][] cnnLayers = new int[][] {	{3, 0, 0 ,0}, 
+											{64, 5, 5, 1},
+											{3, 3, 2}, 
+											{64, 4, 4, 1},
+											{3, 3, 2}, 
+											{128, 3, 3, 1}, 
+											{3, 3, 2}, 
+											{64},
+											{10}
+											};
+		ConvolutionalNeuralNetwork cnn = new ConvolutionalNeuralNetwork(cnnLayers, addBias, padding, useOpenCL); 
+//		Layer l1 = cnn.getInputLayer();
+//		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
+//		PoolingLayer l3 = (PoolingLayer) l2.getNextLayer();
+//		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
+//		PoolingLayer l5 = (PoolingLayer) l4.getNextLayer();
+//		ConvolutionalLayer l6 = (ConvolutionalLayer) l5.getNextLayer();
+//		PoolingLayer l7 = (PoolingLayer) l6.getNextLayer();
+//		FullyConnectedLayer l8 = (FullyConnectedLayer) l7.getNextLayer();
+//		FullyConnectedLayer l9 = (FullyConnectedLayer) l8.getNextLayer();
+//		l2.setActivationType(ActivationType.RELU);
+//		l3.setActivationType(ActivationType.NONE);
+//		l4.setActivationType(ActivationType.RELU);
+//		l5.setActivationType(ActivationType.NONE);
+//		l6.setActivationType(ActivationType.RELU);
+//		l7.setActivationType(ActivationType.NONE);
+//		l8.setActivationType(ActivationType.NONE);
+//		l9.setActivationType(ActivationType.NONE);
+//		l3.setPoolingType(PoolingType.MAX);
+//		l5.setPoolingType(PoolingType.AVER);
+//		l7.setPoolingType(PoolingType.AVER);
+		cnn.setInputShape(new int[] {32, 32});
+		
+//		l2.initWeightsGaussian(0.0001f, 0, 0);
+//		l4.initWeightsGaussian(0.01f, 0, 0);
+//		l6.initWeightsGaussian(0.01f, 0, 0);
+//		l8.initWeightsGaussian(0.1f, 0, 0);
+//		l9.initWeightsGaussian(0.1f, 0, 0);		
+
+//		l2.setLearningRateMultiplication(2f);
+//		l4.setLearningRateMultiplication(2.5f);
+//		l6.setLearningRateMultiplication(2f);
+//		l8.setLearningRateMultiplication(1.5f);
+//		l9.setLearningRateMultiplication(5f);
+		
+		Logger logger = Logger.getLogger("CIFAR10 traing with CNN");
+		logger.log(Level.INFO, "CNN architecture: \n"
+				+ "{0} {1} bias \n"
+				+ "conv layer activation type: {2}\n"
+				+ "fully layer activation type: {3}"
+				, new Object[] {Arrays.deepToString(cnnLayers), addBias ? "with" : "without", ActivationType.RELU, ActivationType.NONE});
+
+		logger.log(Level.INFO, "Traning configuration: \n"
+				+ "useOpenCL = {0} \n"
+				+ "batchSize = {1} \n"
+				+ "costType = {2} \n"
+				+ "epoch = {3} \n"
+				+ "baselearningRate = {4} \n"
+				+ "momentum = {5} \n"
+				+ "weightDecay = {6} \n"
+				+ "lrChangeCycle = {7} \n"
+				+ "lrChangeRate = {8} \n", new Object[] {useOpenCL, batchSize, (costType==0?"CE":"MSE"), epoch, baselearningRate+"", momentum, weightDecay, lrChangeCycle, lrChangeRate});
+//		String path = "/home/jxchang/project/records/cifar/.cnnReLU.weights";
+		String loadPath = Paths.get(System.getProperty("user.dir"), "..", "..", "..","records", "cifar", "cnn254.weights").toString();
+
+		
+		logger.log(Level.INFO, "Pretest before training...");
+//		cnn.test(TestSet);
+//		cnn.loadWeights(loadPath);
+		cnn.test(testSet);
+		for (int i = 0; i < epoch; i += 3) {
+			logger.log(Level.INFO, "learning rate {0}", baselearningRate);
+			cnn.train(trainingSet, costType, baselearningRate, momentum, weightDecay, lrChangeCycle, lrChangeRate, 3, testSet, trainingSet.getDatasetSize()/trainingSet.getBatchSize());
+			cnn.test(trainingSet);
+			if (i < 10)
+			baselearningRate *= lrChangeRate;
+		}
+		
+//		logger.log(Level.INFO, "Saving weights...");
+		String savePath = Paths.get(System.getProperty("user.dir"), "..", "..", "..","records", "cifar", "cnn.weights").toString();
+//		cnn.saveWeights(savePath);
+
+//		float errorRate = cnn.test(TestSet);
+//		assertEquals(0, errorRate, 0.1);	
+
+	}
+	
+	
 	
 	
 //	@Test

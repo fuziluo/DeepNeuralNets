@@ -27,14 +27,15 @@ public class CIFAR10DataProvider implements DataProvider {
     private float[] currentLabelsBatch;  
 	private boolean random;
 	private boolean zeroMean;
+	private boolean normalization;
 	private float[] mean = new float[3072];
 	private DatasetType datasetType;
     
 	public CIFAR10DataProvider(String path, int batchSize, DatasetType datasetType, boolean random) {
-		this(path, batchSize, datasetType, random, true);
+		this(path, batchSize, datasetType, random, true, false);
 	}
 	
-	public CIFAR10DataProvider(String path, int batchSize, DatasetType datasetType, boolean random, boolean zeroMean) {
+	public CIFAR10DataProvider(String path, int batchSize, DatasetType datasetType, boolean random, boolean zeroMean, boolean normalization) {
 		this.datasetType = datasetType;
 		if (datasetType == DatasetType.TRAINING_ALL) {
 			datasets = new RandomAccessFile[5];
@@ -56,6 +57,7 @@ public class CIFAR10DataProvider implements DataProvider {
 				}
 				this.random = random;
 				this.zeroMean = zeroMean;
+				this.normalization = normalization;
 				if (random) {
 					Collections.shuffle(indexSeq, new Random()); //fix seed here for debugging TODO
 				}	
@@ -81,6 +83,7 @@ public class CIFAR10DataProvider implements DataProvider {
 				}
 				this.random = random;
 				this.zeroMean = zeroMean;
+				this.normalization = normalization;
 				if (random) {
 					Collections.shuffle(indexSeq, new Random()); //fix seed here for debugging TODO
 				}	
@@ -96,7 +99,6 @@ public class CIFAR10DataProvider implements DataProvider {
 	}
 
 	private void computeMean(String p) {
-		// TODO Auto-generated method stub
 		String path = Paths.get(p, "mean.mean").toString();
 		File f = new File(path);
 		if(f.exists() && !f.isDirectory()) { 
@@ -111,7 +113,6 @@ public class CIFAR10DataProvider implements DataProvider {
 				channel.close();	
 //				System.out.println(Arrays.toString(mean));
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			return; 
@@ -140,11 +141,8 @@ public class CIFAR10DataProvider implements DataProvider {
 			channel.close();	
 			System.out.println("mean saved to " + path);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
-		
-		
+		}		
 	}
 
 	@Override
@@ -163,12 +161,12 @@ public class CIFAR10DataProvider implements DataProvider {
 				currentLabel[i * 10 + label] = 1;
 				currentLabelsBatch = currentLabel;
 				datasets[currentDatasetNo].readFully(currentImage);
-				//******subtract image mean********
+//				//******subtract image mean********
 //				float mean = 0;
 //				for (int j = 0; j < 3072; j++) {
 //					mean += currentImage[j] & 0xFF;
 //				}
-				//***********************************
+//				//***********************************
 //				for (int j = 0; j < dataSize; j++) {
 //					if (j < 1024)
 //						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean / 3072;
@@ -178,8 +176,8 @@ public class CIFAR10DataProvider implements DataProvider {
 //						result[i * dataSize + j] = (currentImage[j] & 0xFF) - mean / 3072;
 //				}
 				for (int j = 0; j < dataSize; j++) {
-//					result[i * dataSize + j] = (currentImage[j] & 0xFF) - (zeroMean ? (mean / 3072) : 0);
-					result[i * dataSize + j] = (currentImage[j] & 0xFF) - (zeroMean ? (mean[j]) : 0);
+//					result[i * dataSize + j] = ((currentImage[j] & 0xFF) - (zeroMean ? (mean / 3072) : 0)) / (normalization ? 255 : 1);
+					result[i * dataSize + j] = ((currentImage[j] & 0xFF) - (zeroMean ? (mean[j]) : 0)) / (normalization ? 255 : 1);
 				}
 			} catch (IOException e) {
 					e.printStackTrace();

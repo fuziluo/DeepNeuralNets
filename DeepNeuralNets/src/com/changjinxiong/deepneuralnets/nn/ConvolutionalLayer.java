@@ -16,7 +16,7 @@ import com.changjinxiong.deepneuralnets.opencl.OpenCL;
 import static java.lang.Math.*;
 
 
-public class ConvolutionalLayer implements FeatureMapLayer {
+public class ConvolutionalLayer implements FeatureMapLayer, WeightLayer{
 	private final static Logger LOGGER = Logger.getLogger(ConvolutionalLayer.class.getSimpleName()); 
 	private final boolean addBias;
 	private final FeatureMapLayer previousLayer;
@@ -49,7 +49,7 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 	private long[] localWorkSizeK0, localWorkSizeK1, localWorkSizeK2, localWorkSizeK3;
 	private float lrMult = 1;
 	private boolean paraChanged = false;
-	private float lrBiasMult = 2;
+	private float lrBiasMult = 1;
 
 	public ConvolutionalLayer(int numOfOutputFeatureMaps, int filterHeight, int filterWidth, int stride, 
 			FeatureMapLayer previousLayer, Layer nextLayer, boolean addBias, boolean useOpenCL) {
@@ -65,10 +65,10 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		if (previousLayer != null) {
 			this.numOfInputFeatureMaps = previousLayer.getNumOfFeatureMaps();
 //			initializeWeights(0.25f, 0);
-			initializeWeights();
+			initWeights(0);
 			this.gradients = new float[weights.length];
 			this.weightsUpdate = new float[weights.length];
-			activationType = ActivationType.NONE; // change the default setting here
+			activationType = ActivationType.RELU; // change the default setting here
 			if (useOpenCL) {
 		        cl_context context = OpenCL.getContext();
 				weightsUpdateCL = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weightsUpdate.length* Sizeof.cl_float, Pointer.to(weightsUpdate), null);
@@ -167,12 +167,21 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		localWorkSizeK3 = new long[] {128};
 	}
 
-	private void initializeWeights() {
+	@Override
+	public void initWeightsUniform(float lowerLimit, float upperLimit, float bias) {
+		if (upperLimit < lowerLimit) {
+			throw new IllegalArgumentException("upperLimit must not be smaller than lower limit");
+		}
 		weights = new float[numOfOutputFeatureMaps * (numOfInputFeatureMaps * filterHeight * filterWidth + (addBias ? 1 : 0))];
 		Random rnd = new Random(0);
 		for (int i = 0; i < weights.length; i++) {
-			weights[i] = rnd.nextFloat() - 0.5f;
+			weights[i] = rnd.nextFloat() * (upperLimit - lowerLimit) + lowerLimit;
 		}
+		int weightsDim = numOfInputFeatureMaps * filterHeight * filterWidth + (addBias ? 1 : 0);
+		if (addBias) {
+			for (int i = numOfInputFeatureMaps * filterHeight * filterWidth; i < weights.length; i += weightsDim)
+				weights[i] = bias;
+		}		
 		if (useOpenCL) {
 			if (weightsCL != null) {
 				clReleaseMemObject(weightsCL);
@@ -181,12 +190,12 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 		}
 	}
 
-	public void initializeWeights(float delta, float bias) {
+	@Override
+	public void initWeightsGaussian(float std, float mean, float bias) {
 		weights = new float[numOfOutputFeatureMaps * (numOfInputFeatureMaps * filterHeight * filterWidth + (addBias ? 1 : 0))];
 		Random rnd = new Random(0);//fixed seed
 		for (int i = 0; i < weights.length; i++) {
-//			weights[i] = (float) (rnd.nextGaussian() / Math.sqrt(filterHeight * filterWidth * numOfInputFeatureMaps/ 2.0));
-			weights[i] = (float) (rnd.nextGaussian() * delta );
+			weights[i] = (float) (rnd.nextGaussian() * std );
 		}
 		int weightsDim = numOfInputFeatureMaps * filterHeight * filterWidth + (addBias ? 1 : 0);
 		if (addBias) {
@@ -199,6 +208,26 @@ public class ConvolutionalLayer implements FeatureMapLayer {
 			}
 			weightsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
 		}
+	}
+	
+	@Override
+	public void initWeights(float bias) {
+		weights = new float[numOfOutputFeatureMaps * (numOfInputFeatureMaps * filterHeight * filterWidth + (addBias ? 1 : 0))];
+		Random rnd = new Random(0);//fixed seed
+		for (int i = 0; i < weights.length; i++) {
+			weights[i] = (float) (rnd.nextGaussian() * Math.sqrt(2.0 / (filterHeight * filterWidth * numOfOutputFeatureMaps)));
+		}
+		int weightsDim = numOfInputFeatureMaps * filterHeight * filterWidth + (addBias ? 1 : 0);
+		if (addBias) {
+			for (int i = numOfInputFeatureMaps * filterHeight * filterWidth; i < weights.length; i += weightsDim)
+				weights[i] = bias;
+		}
+		if (useOpenCL) {
+			if (weightsCL != null) {
+				clReleaseMemObject(weightsCL);
+			}
+			weightsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
+		}		
 	}
 
 	@Override

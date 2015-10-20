@@ -1,4 +1,4 @@
-package com.changjinxiong.deepneuralnets.test;
+package com.changjinxiong.deepneuralnets.play;
 
 import static org.junit.Assert.*;
 
@@ -18,6 +18,7 @@ import com.changjinxiong.deepneuralnets.nn.PoolingLayer;
 import com.changjinxiong.deepneuralnets.nn.PoolingLayer.PoolingType;
 import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
 import com.changjinxiong.deepneuralnets.opencl.OpenCL;
+import com.changjinxiong.deepneuralnets.test.MnistDataProvider;
 
 public class TestPerformance {
 

@@ -28,20 +28,20 @@ public class TestMLP {
 	public void testWeightsSize() {
 		//check weights
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{10,20,30,20,10,1}, true, false);
-		assertEquals(mlp.getInputLayer().getNextLayer().getWeight().length, 11*20, 0);
-		assertEquals(mlp.getInputLayer().getNextLayer().getNextLayer().getWeight().length, 21*30, 0);
-		assertEquals(mlp.getOutputLayer().getPreviousLayer().getPreviousLayer().getWeight().length, 31*20, 0);
-		assertEquals(mlp.getOutputLayer().getPreviousLayer().getWeight().length, 21*10, 0);
-		assertEquals(mlp.getOutputLayer().getWeight().length, 11*1, 0);		
+		assertEquals(((FullyConnectedLayer) mlp.getInputLayer().getNextLayer()).getWeight().length, 11*20, 0);
+		assertEquals(((FullyConnectedLayer) mlp.getInputLayer().getNextLayer().getNextLayer()).getWeight().length, 21*30, 0);
+		assertEquals(((FullyConnectedLayer) mlp.getOutputLayer().getPreviousLayer().getPreviousLayer()).getWeight().length, 31*20, 0);
+		assertEquals(((FullyConnectedLayer) mlp.getOutputLayer().getPreviousLayer()).getWeight().length, 21*10, 0);
+		assertEquals(((FullyConnectedLayer) mlp.getOutputLayer()).getWeight().length, 11*1, 0);		
 	}
 	@Test
 	public void testForwardPass() {
 		boolean useOpenCL = true;
 		//check forward pass without bias
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{2,2,1}, false, useOpenCL);
-		Layer l3 = mlp.getOutputLayer();
-		Layer l2 = mlp.getOutputLayer().getPreviousLayer();
-		Layer l1 = mlp.getInputLayer();
+		FullyConnectedLayer l3 = (FullyConnectedLayer) mlp.getOutputLayer();
+		FullyConnectedLayer l2 = (FullyConnectedLayer) mlp.getOutputLayer().getPreviousLayer();
+		FullyConnectedLayer l1 = (FullyConnectedLayer) mlp.getInputLayer();
 		l3.setWeight(new float[] {0.1f, 0.2f});
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f});
 		l2.setActivationType(ActivationType.SIGMOID);
@@ -59,9 +59,9 @@ public class TestMLP {
 		
 		//check forward pass with bias
 		mlp = new MultiLayerPerceptron(new int[]{2,2,1}, true, useOpenCL);
-		l3 = mlp.getOutputLayer();
-		l2 = mlp.getOutputLayer().getPreviousLayer();
-		l1 = mlp.getInputLayer();
+		l3 = (FullyConnectedLayer) mlp.getOutputLayer();
+		l2 = (FullyConnectedLayer) mlp.getOutputLayer().getPreviousLayer();
+		l1 = (FullyConnectedLayer) mlp.getInputLayer();
 		l3.setWeight(new float[] {0.1f, 0.2f, 0.3f});
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f});
 		l2.setActivationType(ActivationType.SIGMOID);
@@ -82,9 +82,9 @@ public class TestMLP {
 	public void testBackpropagation() {
 		boolean useOpenCL = true;
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{2,2,1}, true, useOpenCL);
-		Layer l3 = mlp.getOutputLayer();
-		Layer l2 = mlp.getOutputLayer().getPreviousLayer();
-		Layer l1 = mlp.getInputLayer();
+		FullyConnectedLayer l3 = (FullyConnectedLayer) mlp.getOutputLayer();
+		FullyConnectedLayer l2 = (FullyConnectedLayer) mlp.getOutputLayer().getPreviousLayer();
+		FullyConnectedLayer l1 = (FullyConnectedLayer) mlp.getInputLayer();
 
 		l3.setWeight(new float[] {0.1f, 0.2f, 0.3f});
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f});
@@ -215,7 +215,7 @@ public class TestMLP {
 		mlp.forwardPass(tin);
 		mlp.backPropagation(tout, costType);
 		int i = 1;
-		Layer l = l2;
+		FullyConnectedLayer l = (FullyConnectedLayer) l2;
 		float g1 = l.getGradients()[i];
 		double w = l.getWeight()[i];
 		double e = 0.06f;
@@ -261,7 +261,7 @@ public class TestMLP {
 //		float c1 = mlp.getCost(tout);
 		mlp.backPropagation(tout, costType);
 		int i = 2;
-		Layer l = l3;
+		FullyConnectedLayer l = (FullyConnectedLayer) l3;
 		float g1 = l.getGradients()[i];
 		double w = l.getWeight()[i];
 		double e = 0.01f;
@@ -289,8 +289,8 @@ public class TestMLP {
 	public void testWeightsSaveLoad() {
 		boolean useOpenCL = true;
 		NeuralNetwork mlp = new MultiLayerPerceptron(new int[]{2,2,1}, false, useOpenCL);
-		Layer l3 = mlp.getOutputLayer();
-		Layer l2 = mlp.getOutputLayer().getPreviousLayer();
+		FullyConnectedLayer l3 = (FullyConnectedLayer) mlp.getOutputLayer();
+		FullyConnectedLayer l2 = (FullyConnectedLayer) mlp.getOutputLayer().getPreviousLayer();
 		l3.setWeight(new float[] {0.1f, 0.2f});
 		l2.setWeight(new float[] {0.1f, 0.2f, 0.3f, 0.4f});
 		
