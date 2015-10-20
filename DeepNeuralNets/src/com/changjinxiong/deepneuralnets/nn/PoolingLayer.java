@@ -99,16 +99,9 @@ public class PoolingLayer implements FeatureMapLayer {
 		this.poolingType = poolingType;
 	}
 
-	@Override
-	public void updateWeights(float learningRate, float momentum,
-			float weightDecay) {
-		//do nothing
-	}
 
-	@Override
-	public void setWeight(float[] weights) {
-		//do nothing
-	}
+
+
 
 	@Override
 	public void backpropagation() {
@@ -318,10 +311,6 @@ public class PoolingLayer implements FeatureMapLayer {
 		this.nextLayer = nextLayer;
 	}
 
-	@Override
-	public float[] getWeight() {
-		return null;
-	}
 
 	@Override
 	public float[] getActivations() {

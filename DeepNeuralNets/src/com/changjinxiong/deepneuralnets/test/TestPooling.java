@@ -15,6 +15,7 @@ import com.changjinxiong.deepneuralnets.nn.Layer;
 import com.changjinxiong.deepneuralnets.nn.PoolingLayer;
 import com.changjinxiong.deepneuralnets.nn.PoolingLayer.PoolingType;
 import com.changjinxiong.deepneuralnets.nn.Util.ActivationType;
+import com.changjinxiong.deepneuralnets.nn.WeightLayer;
 import com.changjinxiong.deepneuralnets.test.CIFAR10DataProvider.DatasetType;
 
 public class TestPooling {
@@ -34,9 +35,9 @@ public class TestPooling {
 		PoolingLayer l4 = (PoolingLayer) l3.getNextLayer();
 		FullyConnectedLayer l5 = (FullyConnectedLayer) l4.getNextLayer();
 		cnn.setInputShape(new int[] {32, 32});
-		l2.initializeWeights(0.005f, 0);
-		l3.initializeWeights(0.05f, 0);
-		l5.initializeWeights(0.05f, 0);
+		l2.initWeightsGaussian(0.005f, 0, 0);
+		l3.initWeightsGaussian(0.05f, 0, 0);
+		l5.initWeightsGaussian(0.05f, 0, 0);
 		l4.setPoolingType(PoolingType.AVER);
 		
 		cnn.setInputShape(new int[] {32, 32});
@@ -49,7 +50,7 @@ public class TestPooling {
 		cnn.forwardPass(tin);
 		cnn.backPropagation(tout, 0);
 		int i = 0;
-		Layer l = l2;
+		WeightLayer l = l2;
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
@@ -91,9 +92,9 @@ public class TestPooling {
 		PoolingLayer l4 = (PoolingLayer) l3.getNextLayer();
 		FullyConnectedLayer l5 = (FullyConnectedLayer) l4.getNextLayer();
 		cnn.setInputShape(new int[] {32, 32});
-		l2.initializeWeights(0.005f, 0);
-		l3.initializeWeights(0.05f, 0);
-		l5.initializeWeights(0.05f, 0);
+		l2.initWeightsGaussian(0.005f, 0, 0);
+		l3.initWeightsGaussian(0.05f, 0, 0);
+		l5.initWeightsGaussian(0.05f, 0, 0);
 		l4.setPoolingType(PoolingType.AVER);
 		
 //		cnn.setInputShape(new int[] {28, 28});
@@ -108,7 +109,7 @@ public class TestPooling {
 		cnn.forwardPass(tin);
 		cnn.backPropagation(tout, 0);
 		int i = 0;
-		Layer l = l2;
+		WeightLayer l = l2;
 		float g1 = l.getGradients()[i];
 //		System.out.println(Arrays.toString(l.getGradients()));
 //		System.out.println(Arrays.toString(l4.getPrevErrors()));
@@ -152,9 +153,9 @@ public class TestPooling {
 		PoolingLayer l4 = (PoolingLayer) l3.getNextLayer();
 		FullyConnectedLayer l5 = (FullyConnectedLayer) l4.getNextLayer();
 		cnn.setInputShape(new int[] {32, 32});
-		l2.initializeWeights(0.0005f, 0);
-		l3.initializeWeights(0.05f, 0);
-		l5.initializeWeights(0.05f, 0);
+		l2.initWeightsGaussian(0.0005f, 0, 0);
+		l3.initWeightsGaussian(0.05f, 0, 0);
+		l5.initWeightsGaussian(0.05f, 0, 0);
 		l4.setPoolingType(PoolingType.AVER);
 		
 //		cnn.setInputShape(new int[] {28, 28});
@@ -169,7 +170,7 @@ public class TestPooling {
 		cnn.forwardPass(tin);
 		cnn.backPropagation(tout, 0);
 		int i = 0;
-		Layer l = l2;
+		WeightLayer l = l2;
 		float g1 = l.getGradients()[i];
 //		System.out.println(Arrays.toString(l.getGradients()));
 //		System.out.println(Arrays.toString(l4.getPrevErrors()));

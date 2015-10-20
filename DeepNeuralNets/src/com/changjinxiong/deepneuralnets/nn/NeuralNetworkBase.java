@@ -78,7 +78,10 @@ public class NeuralNetworkBase implements NeuralNetwork {
 		Layer currentLayer = inputLayer;
 		while (currentLayer.getNextLayer() != null) {
 			currentLayer = currentLayer.getNextLayer();
-			currentLayer.updateWeights(learningRate, momentum, weightDecay);
+			if (currentLayer instanceof WeightLayer) {
+				WeightLayer l = (WeightLayer) currentLayer;
+				l.updateWeights(learningRate, momentum, weightDecay);
+			}
 		}
 	}
 	/* (non-Javadoc)
@@ -166,7 +169,7 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			k++;
 			l++;
 			int displyCycle = dp.getDatasetSize() / dp.getBatchSize();
-			displyCycle = 100;
+			displyCycle = displyCycle / 5;
 			if (k >= displyCycle) {
 				averageCost /= k;
 				LOGGER.log(Level.INFO, "Average cost over last {0} batches is {1}", new Object[] {k, ""+averageCost});
@@ -360,15 +363,14 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			int bufferSize = 0;
 			float weights[];
 			do {
-				if (layer instanceof PoolingLayer) {
-					layer = layer.getNextLayer();
-					continue; 
+				if (layer instanceof WeightLayer) {
+					WeightLayer l = (WeightLayer) layer; 
+					weights = l.getWeight();
+					bufferSize = 4 * weights.length;
+					ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+					buffer.asFloatBuffer().put(weights);
+					channel.write(buffer); 
 				}
-				weights = layer.getWeight();
-				bufferSize = 4 * weights.length;
-				ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
-				buffer.asFloatBuffer().put(weights);
-				channel.write(buffer);
 				layer = layer.getNextLayer();
 			}
 			while (layer != null);
@@ -386,18 +388,17 @@ public class NeuralNetworkBase implements NeuralNetwork {
 			int bufferSize = 0;
 			float weights[];
 			do {
-				if (layer instanceof PoolingLayer) {
-					layer = layer.getNextLayer();
-					continue; 
+				if (layer instanceof WeightLayer) {
+					WeightLayer l = (WeightLayer) layer; 
+					weights = l.getWeight();
+					bufferSize = 4 * weights.length;
+					ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+					buffer.clear();
+					channel.read(buffer);
+					buffer.flip();
+					buffer.asFloatBuffer().get(weights);
+					l.setWeight(weights);
 				}
-				weights = layer.getWeight();
-				bufferSize = 4 * weights.length;
-				ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
-				buffer.clear();
-				channel.read(buffer);
-				buffer.flip();
-				buffer.asFloatBuffer().get(weights);
-				layer.setWeight(weights);
 				layer = layer.getNextLayer();
 			}
 			while (layer != null);

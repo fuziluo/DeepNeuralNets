@@ -23,7 +23,7 @@ import static java.lang.Math.*;
  * @author jxchang
  *
  */
-public class FullyConnectedLayer implements Layer{
+public class FullyConnectedLayer implements WeightLayer{
 	private final static Logger LOGGER = Logger.getLogger(FullyConnectedLayer.class.getSimpleName()); 
 	private final boolean addBias;
 	private final int numOfPerceptron;
@@ -44,7 +44,7 @@ public class FullyConnectedLayer implements Layer{
 	private cl_kernel kernel0, kernel2, kernel1, kernel3;
 	private long[] localWorkSizeK0, localWorkSizeK1, localWorkSizeK2, localWorkSizeK3;
 	private boolean paraChanged = false;
-	private float lrBiasMult = 2;
+	private float lrBiasMult = 1;
 	
 	public FullyConnectedLayer(int numOfPerceptron, Layer previousLayer, Layer nextLayer, boolean addBias, boolean useOpenCL) {
 		this.addBias = addBias;
@@ -57,11 +57,11 @@ public class FullyConnectedLayer implements Layer{
 		this.nextLayer = nextLayer;
 		
 		if (previousLayer != null) { 
-			activationType = ActivationType.TANH;
+			activationType = ActivationType.NONE; // change the default setting here
 			//only fully connected layer has fixed input size at this time
 			if (previousLayer instanceof FullyConnectedLayer) {
 				//randomly initialize weights
-				initializeWeights();
+				initWeights(0);
 				gradients = new float[weights.length];
 				weightsUpdate = new float[weights.length];
 				//initialize OpenCL 
@@ -158,28 +158,16 @@ public class FullyConnectedLayer implements Layer{
 		localWorkSizeK3 = new long[] {128};
 	}
 	
-	private void initializeWeights() {
+	@Override
+	public void initWeightsUniform(float lowerLimit, float upperLimit, float bias) {
+		if (upperLimit < lowerLimit) {
+			throw new IllegalArgumentException("upperLimit must not be smaller than lower limit");
+		}
 		int weightLength = previousLayer.getNumOfNodes() + (addBias ? 1 : 0);
 		weights = new float[numOfPerceptron * weightLength];
 		Random rnd = new Random(0);
 		for (int i = 0; i < weights.length; i++) {
-			weights[i] = rnd.nextFloat() - 0.5f;
-		}
-		if (useOpenCL) {
-			if (weightsCL != null) {
-				clReleaseMemObject(weightsCL);
-			}
-			weightsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
-		}
-	}
-	
-	public void initializeWeights(float delta, float bias) {
-		int weightLength = previousLayer.getNumOfNodes() + (addBias ? 1 : 0);
-		weights = new float[numOfPerceptron * weightLength];
-		Random rnd = new Random(0); //fixed seed
-		for (int i = 0; i < weights.length; i++) {
-//			weights[i] = (float) (rnd.nextGaussian() / Math.sqrt(previousLayer.getNumOfNodes() / 2.0));
-			weights[i] = (float) (rnd.nextGaussian() * delta);
+			weights[i] = rnd.nextFloat() * (upperLimit - lowerLimit) + lowerLimit;;
 		}
 		if (addBias) {
 			for (int i = previousLayer.getNumOfNodes(); i < weights.length; i += previousLayer.getNumOfNodes() + 1)
@@ -192,6 +180,47 @@ public class FullyConnectedLayer implements Layer{
 			weightsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
 		}
 	}
+	
+	@Override
+	public void initWeightsGaussian(float std, float mean, float bias) {
+		int weightLength = previousLayer.getNumOfNodes() + (addBias ? 1 : 0);
+		weights = new float[numOfPerceptron * weightLength];
+		Random rnd = new Random(0); //fixed seed
+		for (int i = 0; i < weights.length; i++) {
+			weights[i] = (float) (rnd.nextGaussian() * std);
+		}
+		if (addBias) {
+			for (int i = previousLayer.getNumOfNodes(); i < weights.length; i += previousLayer.getNumOfNodes() + 1)
+				weights[i] = bias;		
+		}
+		if (useOpenCL) {
+			if (weightsCL != null) {
+				clReleaseMemObject(weightsCL);
+			}
+			weightsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
+		}
+	}
+	
+	@Override
+	public void initWeights(float bias) {
+		int weightLength = previousLayer.getNumOfNodes() + (addBias ? 1 : 0);
+		weights = new float[numOfPerceptron * weightLength];
+		Random rnd = new Random(0); //fixed seed
+		for (int i = 0; i < weights.length; i++) {
+			weights[i] = (float) (rnd.nextGaussian() * Math.sqrt(2.0 / previousLayer.getNumOfNodes()));
+		}
+		if (addBias) {
+			for (int i = previousLayer.getNumOfNodes(); i < weights.length; i += previousLayer.getNumOfNodes() + 1)
+				weights[i] = bias;		
+		}
+		if (useOpenCL) {
+			if (weightsCL != null) {
+				clReleaseMemObject(weightsCL);
+			}
+			weightsCL = clCreateBuffer(OpenCL.getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weights.length* Sizeof.cl_float, Pointer.to(weights), null);
+		}
+	}
+	
 	@Override
 	public Layer getPreviousLayer() {
 		return previousLayer;
@@ -213,7 +242,7 @@ public class FullyConnectedLayer implements Layer{
 			throw new IllegalStateException("No weights on input layer!");
 		}
 		if (weights == null) {
-			initializeWeights();
+			initWeights(0);
 		}
 		if (useOpenCL) {
 			cl_command_queue commandQueue = OpenCL.getCommandQueue();
@@ -290,7 +319,7 @@ public class FullyConnectedLayer implements Layer{
 		//In the case when previous layer is a feature map, the size of output is unknown until input is fed
 		if (weights == null) {
 			//randomly initialize weights
-			initializeWeights();
+			initWeights(0);
 			paraChanged = true;
 		}
 		if (gradients == null) {
