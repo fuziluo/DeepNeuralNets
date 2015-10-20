@@ -268,9 +268,15 @@ public class TestCNN {
 		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
 		ConvolutionalLayer l3 = (ConvolutionalLayer) l2.getNextLayer();
 		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
-		l2.initWeightsGaussian(0.0001f, 0, 0);
+		l2.initWeightsGaussian(0.25f, 0, 0);
 		l3.initWeightsGaussian(0.25f, 0, 0);
 		l4.initWeightsGaussian(0.25f, 0, 0);
+		
+		l2.setActivationType(ActivationType.TANH);
+		l3.setActivationType(ActivationType.TANH);
+		l4.setActivationType(ActivationType.TANH);
+
+		
 //		cnn.setInputShape(new int[] {28, 28});
 //		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
 		cnn.setInputShape(new int[] {32, 32});
@@ -289,7 +295,7 @@ public class TestCNN {
 		float g1 = l.getGradients()[i];
 		float[] weights = l.getWeight();
 		double w = weights[i];
-		double e = 0.001f;
+		double e = 0.003f;
 		weights[i] = (float) (w - e);
 		l.setWeight(weights);
 		cnn.forwardPass(tin);
@@ -329,9 +335,16 @@ public class TestCNN {
 		ConvolutionalLayer l2 = (ConvolutionalLayer) l1.getNextLayer();
 		ConvolutionalLayer l3 = (ConvolutionalLayer) l2.getNextLayer();
 		ConvolutionalLayer l4 = (ConvolutionalLayer) l3.getNextLayer();
-		l2.initWeightsGaussian(0.0001f, 0, 0);
+		l2.initWeightsGaussian(0.25f, 0, 0);
 		l3.initWeightsGaussian(0.25f, 0, 0);
 		l4.initWeightsGaussian(0.25f, 0, 0);
+		
+		
+		l2.setActivationType(ActivationType.TANH);
+		l3.setActivationType(ActivationType.TANH);
+		l4.setActivationType(ActivationType.TANH);
+
+
 //		cnn.setInputShape(new int[] {28, 28});
 //		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
 		cnn.setInputShape(new int[] {32, 32});

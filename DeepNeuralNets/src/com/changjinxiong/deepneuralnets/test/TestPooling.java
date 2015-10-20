@@ -40,6 +40,11 @@ public class TestPooling {
 		l5.initWeightsGaussian(0.05f, 0, 0);
 		l4.setPoolingType(PoolingType.AVER);
 		
+		l2.setActivationType(ActivationType.TANH);
+		l3.setActivationType(ActivationType.TANH);
+		l4.setActivationType(ActivationType.TANH);
+		l5.setActivationType(ActivationType.TANH);
+
 		cnn.setInputShape(new int[] {32, 32});
 		String p = Paths.get(System.getProperty("user.dir"), "..", "..", "..","datasets", "CIFAR", "cifar-10-batches-bin").toString();
 		CIFAR10DataProvider tp = new CIFAR10DataProvider(p, batchSize, DatasetType.TRAINING_ALL, false);
@@ -96,6 +101,11 @@ public class TestPooling {
 		l3.initWeightsGaussian(0.05f, 0, 0);
 		l5.initWeightsGaussian(0.05f, 0, 0);
 		l4.setPoolingType(PoolingType.AVER);
+
+		l2.setActivationType(ActivationType.TANH);
+		l3.setActivationType(ActivationType.TANH);
+		l4.setActivationType(ActivationType.TANH);
+		l5.setActivationType(ActivationType.TANH);
 		
 //		cnn.setInputShape(new int[] {28, 28});
 //		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
@@ -157,6 +167,11 @@ public class TestPooling {
 		l3.initWeightsGaussian(0.05f, 0, 0);
 		l5.initWeightsGaussian(0.05f, 0, 0);
 		l4.setPoolingType(PoolingType.AVER);
+
+		l2.setActivationType(ActivationType.TANH);
+		l3.setActivationType(ActivationType.TANH);
+		l4.setActivationType(ActivationType.TANH);
+		l5.setActivationType(ActivationType.TANH);
 		
 //		cnn.setInputShape(new int[] {28, 28});
 //		MnistDataProvider tp = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);

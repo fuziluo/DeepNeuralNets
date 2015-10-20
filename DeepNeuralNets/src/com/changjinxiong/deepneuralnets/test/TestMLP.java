@@ -190,6 +190,9 @@ public class TestMLP {
 		Layer l4 = mlp.getOutputLayer();
 		Layer l3 = l4.getPreviousLayer();
 		Layer l2 = l3.getPreviousLayer();
+		l4.setActivationType(ActivationType.SIGMOID);
+		l2.setActivationType(ActivationType.SIGMOID);
+		l2.setActivationType(ActivationType.SIGMOID);
 		int costType = 0;
 		int batchSize = 8;
 		MnistDataProvider mnistTraining = new MnistDataProvider("test/train-images-idx3-ubyte", "test/train-labels-idx1-ubyte", batchSize, false);
@@ -218,7 +221,7 @@ public class TestMLP {
 		FullyConnectedLayer l = (FullyConnectedLayer) l2;
 		float g1 = l.getGradients()[i];
 		double w = l.getWeight()[i];
-		double e = 0.06f;
+		double e = 0.01f;
 		float[] tempW = l.getWeight();
 		tempW[i] = (float) (w - e);
 		l.setWeight(tempW);
